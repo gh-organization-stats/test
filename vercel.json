@@ -1,0 +1,19 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/badge/:path*",
+      "destination": "/api/badge"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/badge/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    }
+  ]
+}
