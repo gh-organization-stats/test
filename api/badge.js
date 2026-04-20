@@ -59,8 +59,12 @@ module.exports = async (req, res) => {
     } catch (error) {
         console.error(`[ERROR] ${error.message}`);
         
-        const queryString = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+        // Ekstrak parameter 'style' dari query string
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const styleParam = url.searchParams.get('style');
+        const styleQuery = styleParam ? `?style=${encodeURIComponent(styleParam)}` : '';
         
+        // Tentukan pesan error untuk badge
         let errorMessage = 'Proxy Error';
         let statusCode = 500;
         
@@ -81,7 +85,8 @@ module.exports = async (req, res) => {
             statusCode = 400;
         }
         
-        const errorBadgeUrl = `${BADGE_SERVICE_BASE}/badge/${encodeURIComponent(errorMessage)}-red${queryString}`;
+        // Buat badge error dengan warna merah dan style sesuai permintaan
+        const errorBadgeUrl = `${BADGE_SERVICE_BASE}/badge/${encodeURIComponent(errorMessage)}-red${styleQuery}`;
         
         try {
             const errorResponse = await fetch(errorBadgeUrl);
@@ -95,6 +100,7 @@ module.exports = async (req, res) => {
             console.error('[ERROR] Could not fetch error badge:', fetchError.message);
         }
         
+        // Fallback minimal SVG
         res.setHeader('Content-Type', 'image/svg+xml');
         res.setHeader('Cache-Control', 'no-cache');
         res.status(statusCode).send(`
