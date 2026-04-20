@@ -4,15 +4,9 @@ const fetch = require('node-fetch');
 const BADGE_SERVICE_BASE = 'https://custom-icon-badges.demolab.com';
 const GITHUB_API_BASE = 'https://api.github.com';
 
-// Gunakan token GitHub dari environment variable (opsional) untuk meningkatkan rate limit
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const githubHeaders = GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {};
 
-/**
- * Memeriksa apakah sebuah akun GitHub adalah organisasi.
- * @param {string} owner - Nama akun (user atau organisasi)
- * @returns {Promise<boolean>} - true jika organisasi, false jika user, throw jika error
- */
 async function isOrganization(owner) {
     const url = `${GITHUB_API_BASE}/users/${owner}`;
     const response = await fetch(url, { headers: githubHeaders });
@@ -33,30 +27,24 @@ async function isOrganization(owner) {
 
 module.exports = async (req, res) => {
     try {
-        // Ambil path setelah '/api/badge'
         let targetPath = req.url.replace('/api/badge', '');
         
-        // Validasi: hanya izinkan path yang diawali dengan /github/
         if (!targetPath.startsWith('/github/')) {
             throw new Error('Invalid path: only /github/* endpoints are allowed');
         }
         
-        // Ekstrak segmen path
         const segments = targetPath.split('/').filter(s => s !== '');
-        // segments[0] = 'github', segments[1] = metric, segments[2] = owner, segments[3] = repo (opsional)
         if (segments.length < 3) {
             throw new Error('Invalid GitHub endpoint format');
         }
         
-        const owner = segments[2]; // Nama akun (organisasi)
+        const owner = segments[2];
         
-        // Validasi bahwa akun adalah organisasi
         const orgCheck = await isOrganization(owner);
         if (!orgCheck) {
             throw new Error(`Account '${owner}' is not an organization`);
         }
         
-        // Lanjutkan ke layanan badge
         const targetUrl = `${BADGE_SERVICE_BASE}${targetPath}`;
         console.log(`[INFO] Proxying to: ${targetUrl}`);
         
@@ -71,7 +59,8 @@ module.exports = async (req, res) => {
     } catch (error) {
         console.error(`[ERROR] ${error.message}`);
         
-        // Tentukan pesan error untuk badge
+        const queryString = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+        
         let errorMessage = 'Proxy Error';
         let statusCode = 500;
         
@@ -92,8 +81,7 @@ module.exports = async (req, res) => {
             statusCode = 400;
         }
         
-        // Buat badge error menggunakan layanan yang sama
-        const errorBadgeUrl = `${BADGE_SERVICE_BASE}/badge/${encodeURIComponent(errorMessage)}-red?style=flat`;
+        const errorBadgeUrl = `${BADGE_SERVICE_BASE}/badge/${encodeURIComponent(errorMessage)}-red${queryString}`;
         
         try {
             const errorResponse = await fetch(errorBadgeUrl);
@@ -107,7 +95,6 @@ module.exports = async (req, res) => {
             console.error('[ERROR] Could not fetch error badge:', fetchError.message);
         }
         
-        // Fallback minimal SVG
         res.setHeader('Content-Type', 'image/svg+xml');
         res.setHeader('Cache-Control', 'no-cache');
         res.status(statusCode).send(`
