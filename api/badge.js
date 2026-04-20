@@ -8,9 +8,9 @@ module.exports = async (req, res) => {
         
         // Bangun URL ke endpoint badge-json
         // Gunakan base URL dari environment variable atau deteksi otomatis
-        const baseUrl = process.env.VERCEL_URL 
-            ? `https://${process.env.VERCEL_URL}` 
-            : `http://localhost:${process.env.PORT || 3000}`;
+        const host = req.headers.host;
+        const protocol = host.startsWith('localhost') ? 'http' : 'https';
+        const baseUrl = `${protocol}://${host}`;
             
         const jsonEndpointUrl = `${baseUrl}/api/badge-json${queryParams}`;
         
