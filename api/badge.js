@@ -1,56 +1,55 @@
 // api/badge.js
 const fetch = require('node-fetch');
 
+const BADGE_SERVICE_BASE = 'https://custom-icon-badges.demolab.com';
+
 module.exports = async (req, res) => {
     try {
-        // Ambil semua query parameter dari request
-        const queryParams = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+        const targetPath = req.url.replace('/api/badge', '');
+        const targetUrl = `${BADGE_SERVICE_BASE}${targetPath}`;
         
-        // Bangun URL ke endpoint badge-json
-        // Gunakan base URL dari environment variable atau deteksi otomatis
-        const host = req.headers.host;
-        const protocol = host.startsWith('localhost') ? 'http' : 'https';
-        const baseUrl = `${protocol}://${host}`;
-            
-        const jsonEndpointUrl = `${baseUrl}/api/badge-json${queryParams}`;
+        console.log(`[INFO] Proxying to: ${targetUrl}`);
         
-        // Bangun URL ke custom-icon-badges
-        const badgeServiceUrl = `https://custom-icon-badges.demolab.com/endpoint?url=${encodeURIComponent(jsonEndpointUrl)}`;
+        const response = await fetch(targetUrl);
         
-        // Fetch badge SVG dari layanan custom-icon-badges
-        const response = await fetch(badgeServiceUrl);
-        
+        // Teruskan response upstream apa adanya (termasuk error badge)
         if (!response.ok) {
-            // Jika gagal, kirimkan SVG error sederhana
-            res.setHeader('Content-Type', 'image/svg+xml');
-            res.setHeader('Cache-Control', 'no-cache');
-            return res.send(`
-                <svg xmlns="http://www.w3.org/2000/svg" width="120" height="20">
-                    <rect width="120" height="20" fill="#e05d44"/>
-                    <text x="5" y="14" fill="#fff" font-family="sans-serif" font-size="11">Badge Error</text>
-                </svg>
-            `);
+            console.warn(`[WARN] Upstream returned ${response.status}`);
         }
         
-        // Ambil konten SVG
         const svgContent = await response.text();
         
-        // Set header yang sesuai
-        res.setHeader('Content-Type', 'image/svg+xml');
-        // Cache selama 1 jam (3600 detik)
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        
-        // Kirim SVG
-        res.send(svgContent);
+        res.setHeader('Content-Type', response.headers.get('content-type') || 'image/svg+xml');
+        const cacheControl = response.headers.get('cache-control');
+        res.setHeader('Cache-Control', cacheControl || 'public, max-age=3600');
+        res.status(response.status).send(svgContent);
         
     } catch (error) {
-        console.error('[ERROR] Badge rendering failed:', error);
+        console.error(`[ERROR] Proxy error: ${error.message}`);
+        
+        // Untuk error proxy, kita buat badge menggunakan layanan yang sama
+        const errorBadgeUrl = `${BADGE_SERVICE_BASE}/badge/Proxy-Error-red?style=flat`;
+        
+        try {
+            const errorResponse = await fetch(errorBadgeUrl);
+            if (errorResponse.ok) {
+                const errorSvg = await errorResponse.text();
+                res.setHeader('Content-Type', 'image/svg+xml');
+                res.setHeader('Cache-Control', 'no-cache');
+                return res.status(500).send(errorSvg);
+            }
+        } catch (fetchError) {
+            // Fallback terakhir jika fetch error badge juga gagal
+            console.error('[ERROR] Could not fetch error badge:', fetchError.message);
+        }
+        
+        // Fallback minimal SVG jika semuanya gagal
         res.setHeader('Content-Type', 'image/svg+xml');
         res.setHeader('Cache-Control', 'no-cache');
-        res.send(`
+        res.status(500).send(`
             <svg xmlns="http://www.w3.org/2000/svg" width="120" height="20">
                 <rect width="120" height="20" fill="#e05d44"/>
-                <text x="5" y="14" fill="#fff" font-family="sans-serif" font-size="11">Service Error</text>
+                <text x="5" y="14" fill="#fff" font-family="sans-serif" font-size="11">Error</text>
             </svg>
         `);
     }
