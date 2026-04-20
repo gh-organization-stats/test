@@ -1,5 +1,8 @@
 {
+  "name": "github-org-stats",
+  "version": "1.0.0",
+  "type": "module",
   "dependencies": {
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^3.3.2"
   }
 }
