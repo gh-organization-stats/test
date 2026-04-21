@@ -50,7 +50,7 @@ export default async function handleBadgeRequest(req, res) {
             }
 
             const { value, extraData } = await calculateOrgStats(filteredRepos, metric, org);
-            const config = metricConfig[metric] || { label: metric, color: 'blue', logo: 'github' };
+            const config = metricConfig[metric] || { label: metric, color: 'blue' };
 
             let message = value;
             if (metric === 'size') {
