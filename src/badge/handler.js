@@ -101,11 +101,10 @@ async function handleCustomMetric(metric, owner, req, res) {
 
     const badgePath = `/badge/${encodeURIComponent(config.label)}-${encodeURIComponent(message)}-${config.color}`;
     const params = new URLSearchParams();
-    if (styleParam) params.set('style', styleParam);
-    if (config.logo) params.set('logo', config.logo);
-    const badgeUrl = `${BADGE_SERVICE_BASE}${badgePath}?${params.toString()}`;
+    params.delete('exclude');
+    const queryString = params.toString();
+    const badgeUrl = `${BADGE_SERVICE_BASE}${badgePath}${queryString ? '?' + queryString : ''}`;
 
-    console.log(`[INFO] Generated badge URL: ${badgeUrl}`);
     const response = await fetch(badgeUrl);
     await pipeResponse(response, res, 'public, max-age=21600');
 }
