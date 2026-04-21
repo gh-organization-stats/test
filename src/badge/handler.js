@@ -1,27 +1,31 @@
 import fetch from 'node-fetch';
 import { BADGE_SERVICE_BASE } from '../config.js';
-import { fetchAllOrgRepos } from '../github/api.js';
+import { isOrganization, fetchAllOrgRepos } from '../github/api.js';
 import { calculateOrgStats, metricConfig } from '../github/org-stats.js';
 import { formatNumber, formatSize } from '../lib/formatters.js';
 
 /**
- * Router utama untuk /api/badge/*
- *
- * Pendekatan:
- * - Ambil seluruh path setelah /api/badge (misal: /stars/vercel/next.js)
- * - Ambil segmen pertama sebagai 'metric'.
- * - Jika metric adalah metrik kustom kita (terdaftar di metricConfig), maka:
- *     - Asumsikan format: /{metric}/{owner}
- *     - Jalankan perhitungan agregat untuk akun tersebut (bisa user atau org).
- * - Jika bukan metrik kustom, tambahkan prefix '/github' dan teruskan ke Shields.io.
+ * Mengekstrak owner dari path berdasarkan aturan Shields.io.
+ * @param {string[]} segments - Array segmen path (tanpa '/api/badge')
+ * @returns {string} - Nama owner
  */
+function extractOwner(segments) {
+    if (segments.length === 2) {
+        // Format: /{metric}/{owner}
+        return segments[1];
+    } else if (segments.length >= 3) {
+        // Format: /{metric}/{subpath...}/{owner}/{repo}
+        return segments[segments.length - 2];
+    }
+    throw new Error('Invalid path: cannot determine owner');
+}
+
 export default async function handleBadgeRequest(req, res) {
     try {
         const url = new URL(req.url, `http://${req.headers.host}`);
-        const path = url.pathname.replace('/api/badge', ''); // hasil: /{metric}/{...}
+        const path = url.pathname.replace('/api/badge', '');
         const queryString = url.search;
 
-        // Ambil segmen pertama (metric)
         const segments = path.split('/').filter(s => s !== '');
         if (segments.length === 0) {
             throw new Error('Invalid path. Expected /{metric}/...');
@@ -29,18 +33,26 @@ export default async function handleBadgeRequest(req, res) {
 
         const metric = segments[0];
 
-        // Cek apakah ini metrik kustom kita (agregat akun)
+        // Tentukan owner berdasarkan path
+        const owner = extractOwner(segments);
+
+        // Validasi: owner harus organisasi
+        const orgCheck = await isOrganization(owner);
+        if (!orgCheck) {
+            throw new Error(`Account '${owner}' is not an organization`);
+        }
+
+        // Jika metrik kustom, hitung agregat
         if (metricConfig.hasOwnProperty(metric)) {
-            // Metrik kustom hanya mendukung format: /{metric}/{owner}
-            if (segments.length < 2) {
-                throw new Error(`Custom metric '${metric}' requires an owner name. Format: /${metric}/{owner}`);
+            // Metrik kustom hanya untuk format /{metric}/{owner}
+            if (segments.length !== 2) {
+                throw new Error(`Custom metric '${metric}' only supports format /${metric}/{owner}`);
             }
-            const owner = segments[1];
             await handleCustomMetric(metric, owner, req, res);
             return;
         }
 
-        // Bukan metrik kustom → tambahkan prefix '/github' dan proxy ke Shields.io
+        // Bukan metrik kustom → proxy ke Shields.io dengan prefix /github
         let proxyPath = path;
         if (!proxyPath.startsWith('/github/')) {
             proxyPath = '/github' + proxyPath;
@@ -57,15 +69,11 @@ export default async function handleBadgeRequest(req, res) {
     }
 }
 
-/**
- * Menangani metrik kustom untuk agregat akun (user atau organisasi).
- */
 async function handleCustomMetric(metric, owner, req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const excludeParam = url.searchParams.get('exclude');
     const styleParam = url.searchParams.get('style');
 
-    // Ambil semua repo publik milik owner (cache 6 jam)
     const allRepos = await fetchAllOrgRepos(owner);
     let filteredRepos = allRepos;
     if (excludeParam) {
@@ -78,7 +86,6 @@ async function handleCustomMetric(metric, owner, req, res) {
         console.log(`[INFO] Excluded: ${excludeList.join(', ')}. Remaining: ${filteredRepos.length}`);
     }
 
-    // Hitung metrik
     const { value, extraData } = await calculateOrgStats(filteredRepos, metric, owner);
     const config = metricConfig[metric];
 
@@ -92,7 +99,6 @@ async function handleCustomMetric(metric, owner, req, res) {
         message += ` (${extraData.count} repos)`;
     }
 
-    // Bangun badge
     const badgePath = `/badge/${encodeURIComponent(config.label)}-${encodeURIComponent(message)}-${config.color}`;
     const params = new URLSearchParams();
     if (styleParam) params.set('style', styleParam);
@@ -104,9 +110,6 @@ async function handleCustomMetric(metric, owner, req, res) {
     await pipeResponse(response, res, 'public, max-age=21600');
 }
 
-/**
- * Meneruskan response dari upstream ke client.
- */
 async function pipeResponse(upstreamRes, clientRes, customCacheControl = null) {
     const contentType = upstreamRes.headers.get('content-type') || 'image/svg+xml';
     const cacheControl = customCacheControl || upstreamRes.headers.get('cache-control') || 'public, max-age=3600';
@@ -117,9 +120,6 @@ async function pipeResponse(upstreamRes, clientRes, customCacheControl = null) {
     clientRes.send(body);
 }
 
-/**
- * Mengirim badge error dengan style yang sesuai.
- */
 async function sendErrorBadge(res, error, req) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const styleParam = url.searchParams.get('style');
@@ -137,6 +137,9 @@ async function sendErrorBadge(res, error, req) {
     } else if (error.message.includes('rate limit')) {
         errorMessage = 'Rate Limit Exceeded';
         statusCode = 429;
+    } else if (error.message.includes('not an organization')) {
+        errorMessage = 'Not an Organization';
+        statusCode = 400;
     } else if (error.message.includes('Custom metric')) {
         errorMessage = 'Invalid Format';
         statusCode = 400;
@@ -159,7 +162,6 @@ async function sendErrorBadge(res, error, req) {
         console.error('Failed to fetch error badge:', e.message);
     }
 
-    // Fallback SVG
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Cache-Control', 'no-cache');
     res.status(statusCode).send(`

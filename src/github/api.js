@@ -5,6 +5,24 @@ import { GITHUB_API_BASE, PER_PAGE, githubHeaders } from '../config.js';
 const cache = new Map();
 const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 jam dalam milidetik
 
+export async function isOrganization(owner) {
+    const url = `${GITHUB_API_BASE}/users/${owner}`;
+    const response = await fetch(url, { headers: githubHeaders });
+
+    if (!response.ok) {
+        if (response.status === 404) {
+            throw new Error(`Account '${owner}' not found`);
+        } else if (response.status === 403) {
+            throw new Error('GitHub API rate limit exceeded');
+        } else {
+            throw new Error(`GitHub API error: ${response.status}`);
+        }
+    }
+
+    const data = await response.json();
+    return data.type === 'Organization';
+}
+
 /**
  * Mengambil SEMUA repositori publik dari sebuah organisasi (dengan caching).
  * @param {string} org - Nama organisasi
