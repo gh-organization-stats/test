@@ -13,7 +13,7 @@ import { formatNumber, formatSize } from '../lib/formatters.js';
  * - Jika metric adalah metrik kustom kita (terdaftar di metricConfig), maka:
  *     - Asumsikan format: /{metric}/{org}
  *     - Jalankan perhitungan agregat untuk organisasi tersebut.
- * - Jika bukan metrik kustom, teruskan seluruh path ke Shields.io sebagai proxy.
+ * - Jika bukan metrik kustom, tambahkan prefix '/github' dan teruskan ke Shields.io.
  */
 export default async function handleBadgeRequest(req, res) {
     try {
@@ -40,8 +40,12 @@ export default async function handleBadgeRequest(req, res) {
             return;
         }
 
-        // Bukan metrik kustom → teruskan sebagai proxy ke Shields.io
-        const targetUrl = `${BADGE_SERVICE_BASE}${path}${queryString}`;
+        // Bukan metrik kustom → tambahkan prefix '/github' dan proxy ke Shields.io
+        let proxyPath = path;
+        if (!proxyPath.startsWith('/github/')) {
+            proxyPath = '/github' + proxyPath;
+        }
+        const targetUrl = `${BADGE_SERVICE_BASE}${proxyPath}${queryString}`;
         console.log(`[INFO] Proxying to Shields.io: ${targetUrl}`);
         const response = await fetch(targetUrl);
         await pipeResponse(response, res);
