@@ -3,13 +3,14 @@ import { GITHUB_API_BASE, githubHeaders } from '../config.js';
 
 /**
  * Menghitung metrik agregat dari daftar repositori.
+ * Semua metrik dihitung dari seluruh repositori (tidak ada sampling).
  */
 export async function calculateOrgStats(repos, metric, org) {
     let value;
     let extraData = null;
 
     switch (metric) {
-        // --- Akumulasi langsung ---
+        // --- Akumulasi langsung (dari data repo yang sudah ada) ---
         case 'stars':
             value = repos.reduce((sum, r) => sum + r.stargazers_count, 0);
             break;
@@ -32,7 +33,7 @@ export async function calculateOrgStats(repos, metric, org) {
             value = repos.length;
             break;
 
-        // --- Bahasa & Topik (tidak perlu API tambahan) ---
+        // --- Bahasa & Topik (dari data repo) ---
         case 'top-language': {
             const langCount = {};
             repos.forEach(r => {
@@ -76,9 +77,9 @@ export async function calculateOrgStats(repos, metric, org) {
             break;
         }
 
-        // --- Metrik dengan API tambahan (sampel 10 repo, diskalakan) ---
+        // --- Metrik dengan API tambahan (loop seluruh repositori) ---
         case 'contributors':
-            value = await aggregateWithSampling(repos, async (repo) => {
+            value = await aggregateAll(repos, async (repo) => {
                 const url = `${GITHUB_API_BASE}/repos/${repo.full_name}/contributors?per_page=1&anon=true`;
                 const res = await fetch(url, { headers: githubHeaders });
                 if (res.ok) {
@@ -94,8 +95,8 @@ export async function calculateOrgStats(repos, metric, org) {
             });
             break;
 
-        case 'open-prs': {
-            value = await aggregateWithSampling(repos, async (repo) => {
+        case 'open-prs':
+            value = await aggregateAll(repos, async (repo) => {
                 const url = `${GITHUB_API_BASE}/repos/${repo.full_name}/pulls?state=open&per_page=1`;
                 const res = await fetch(url, { headers: githubHeaders });
                 if (res.ok) {
@@ -110,11 +111,9 @@ export async function calculateOrgStats(repos, metric, org) {
                 return 0;
             });
             break;
-        }
 
-        case 'commits': {
-            // Commit activity (52 minggu) – hanya tersedia jika repo tidak kosong
-            value = await aggregateWithSampling(repos, async (repo) => {
+        case 'commits':
+            value = await aggregateAll(repos, async (repo) => {
                 const url = `${GITHUB_API_BASE}/repos/${repo.full_name}/stats/commit_activity`;
                 const res = await fetch(url, { headers: githubHeaders });
                 if (res.ok) {
@@ -126,10 +125,9 @@ export async function calculateOrgStats(repos, metric, org) {
                 return 0;
             });
             break;
-        }
 
-        case 'branches': {
-            value = await aggregateWithSampling(repos, async (repo) => {
+        case 'branches':
+            value = await aggregateAll(repos, async (repo) => {
                 const url = `${GITHUB_API_BASE}/repos/${repo.full_name}/branches?per_page=1`;
                 const res = await fetch(url, { headers: githubHeaders });
                 if (res.ok) {
@@ -144,10 +142,9 @@ export async function calculateOrgStats(repos, metric, org) {
                 return 0;
             });
             break;
-        }
 
-        case 'releases': {
-            value = await aggregateWithSampling(repos, async (repo) => {
+        case 'releases':
+            value = await aggregateAll(repos, async (repo) => {
                 const url = `${GITHUB_API_BASE}/repos/${repo.full_name}/releases?per_page=1`;
                 const res = await fetch(url, { headers: githubHeaders });
                 if (res.ok) {
@@ -162,10 +159,9 @@ export async function calculateOrgStats(repos, metric, org) {
                 return 0;
             });
             break;
-        }
 
-        case 'tags': {
-            value = await aggregateWithSampling(repos, async (repo) => {
+        case 'tags':
+            value = await aggregateAll(repos, async (repo) => {
                 const url = `${GITHUB_API_BASE}/repos/${repo.full_name}/tags?per_page=1`;
                 const res = await fetch(url, { headers: githubHeaders });
                 if (res.ok) {
@@ -180,9 +176,8 @@ export async function calculateOrgStats(repos, metric, org) {
                 return 0;
             });
             break;
-        }
 
-        // --- Data langsung dari endpoint organisasi ---
+        // --- Data dari endpoint organisasi ---
         case 'followers':
             try {
                 const res = await fetch(`${GITHUB_API_BASE}/orgs/${org}`, { headers: githubHeaders });
@@ -207,38 +202,26 @@ export async function calculateOrgStats(repos, metric, org) {
 }
 
 /**
- * Agregasi dengan sampling (ambil 10 repo pertama, lalu hitung rata-rata dan skala).
- * @param {Array} repos - Daftar repo
- * @param {Function} fetchFn - Fungsi async yang mengembalikan nilai per repo
- * @returns {Promise<number>} - Total estimasi
+ * Agregasi dengan menjalankan fungsi async pada semua repositori.
+ * Menangani error per repo secara individual agar satu kegagalan tidak menggagalkan seluruh proses.
  */
-async function aggregateWithSampling(repos, fetchFn) {
-    const SAMPLE_SIZE = 10;
-    const sample = repos.slice(0, SAMPLE_SIZE);
+async function aggregateAll(repos, fetchFn) {
     let total = 0;
-    let successCount = 0;
-
-    for (const repo of sample) {
+    for (const repo of repos) {
         try {
             const val = await fetchFn(repo);
             if (typeof val === 'number' && !isNaN(val)) {
                 total += val;
-                successCount++;
             }
         } catch (e) {
-            console.warn(`Sampling failed for ${repo.full_name}: ${e.message}`);
+            console.warn(`[WARN] Failed to fetch data for ${repo.full_name}: ${e.message}`);
         }
     }
-
-    if (successCount === 0) return 0;
-
-    const avg = total / successCount;
-    return Math.round(avg * repos.length);
+    return total;
 }
 
-// --- Konfigurasi tampilan badge (logo dihapus) ---
+// --- Konfigurasi tampilan badge (tanpa logo default) ---
 export const metricConfig = {
-    // Basic
     stars:          { label: 'Total Stars', color: 'yellow' },
     forks:          { label: 'Total Forks', color: 'blue' },
     watchers:       { label: 'Total Watchers', color: 'orange' },
@@ -248,20 +231,17 @@ export const metricConfig = {
     'open-issues':  { label: 'Open Issues', color: 'green' },
     'repo-count':   { label: 'Public Repos', color: 'brightgreen' },
     repos:          { label: 'Public Repos', color: 'brightgreen' },
-    // Language & Topics
     'top-language': { label: 'Top Language', color: 'blue' },
     'languages-count': { label: 'Languages', color: 'blue' },
     'top-topic':    { label: 'Top Topic', color: 'blue' },
     'topics-count': { label: 'Topics', color: 'blue' },
     'top-license':  { label: 'Top License', color: 'blue' },
-    // Activity
     contributors:   { label: 'Contributors', color: 'blue' },
     'open-prs':     { label: 'Open PRs', color: 'blue' },
     commits:        { label: 'Commits (52w)', color: 'blue' },
     branches:       { label: 'Branches', color: 'blue' },
     releases:       { label: 'Releases', color: 'blue' },
     tags:           { label: 'Tags', color: 'blue' },
-    // Org meta
     followers:      { label: 'Followers', color: 'blue' },
     created:        { label: 'Created', color: 'blue' }
 };

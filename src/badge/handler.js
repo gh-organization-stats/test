@@ -4,9 +4,6 @@ import { isOrganization, fetchAllOrgRepos } from '../github/api.js';
 import { calculateOrgStats, metricConfig } from '../github/org-stats.js';
 import { formatNumber, formatSize } from '../lib/formatters.js';
 
-/**
- * Router utama untuk /api/badge/*
- */
 export default async function handleBadgeRequest(req, res) {
     try {
         const url = new URL(req.url, `http://${req.headers.host}`);
@@ -37,6 +34,7 @@ export default async function handleBadgeRequest(req, res) {
                 throw new Error(`Account '${org}' is not an organization`);
             }
 
+            // Gunakan fetchAllOrgRepos yang sudah di-cache
             const allRepos = await fetchAllOrgRepos(org);
             let filteredRepos = allRepos;
             if (excludeParam) {
@@ -53,7 +51,7 @@ export default async function handleBadgeRequest(req, res) {
             const config = metricConfig[metric] || { label: metric, color: 'blue' };
 
             let message = value;
-            if (metric === 'size') {
+            if (metric === 'size' || metric === 'disk-usage') {
                 message = formatSize(value);
             } else if (typeof value === 'number' && metric !== 'created' && metric !== 'top-language') {
                 message = formatNumber(value);
@@ -70,7 +68,9 @@ export default async function handleBadgeRequest(req, res) {
 
             console.log(`[INFO] Generated badge URL: ${badgeUrl}`);
             const response = await fetch(badgeUrl);
-            await pipeResponse(response, res);
+            
+            // Karena data kita sudah di-cache 6 jam, badge juga bisa di-cache lama
+            await pipeResponse(response, res, 'public, max-age=21600');
             return;
         }
 
@@ -81,12 +81,9 @@ export default async function handleBadgeRequest(req, res) {
     }
 }
 
-/**
- * Meneruskan response dari upstream ke client.
- */
-async function pipeResponse(upstreamRes, clientRes) {
+async function pipeResponse(upstreamRes, clientRes, customCacheControl = null) {
     const contentType = upstreamRes.headers.get('content-type') || 'image/svg+xml';
-    const cacheControl = upstreamRes.headers.get('cache-control') || 'public, max-age=3600';
+    const cacheControl = customCacheControl || upstreamRes.headers.get('cache-control') || 'public, max-age=3600';
     clientRes.setHeader('Content-Type', contentType);
     clientRes.setHeader('Cache-Control', cacheControl);
     clientRes.status(upstreamRes.status);
@@ -94,9 +91,6 @@ async function pipeResponse(upstreamRes, clientRes) {
     clientRes.send(body);
 }
 
-/**
- * Mengirim badge error dengan style yang sesuai.
- */
 async function sendErrorBadge(res, error, req) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const styleParam = url.searchParams.get('style');
@@ -136,7 +130,6 @@ async function sendErrorBadge(res, error, req) {
         console.error('Failed to fetch error badge:', e.message);
     }
 
-    // Fallback SVG
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Cache-Control', 'no-cache');
     res.status(statusCode).send(`
