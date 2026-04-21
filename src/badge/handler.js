@@ -4,45 +4,69 @@ import { isOrganization, fetchAllOrgRepos } from '../github/api.js';
 import { calculateOrgStats, metricConfig } from '../github/org-stats.js';
 import { formatNumber, formatSize } from '../lib/formatters.js';
 
+/**
+ * Router utama untuk /api/badge/*
+ *
+ * Pendekatan:
+ * - Ambil seluruh path setelah /api/badge (misal: /stars/vercel/next.js)
+ * - Ambil segmen pertama sebagai 'metric'.
+ * - Jika metric adalah metrik kustom kita (terdaftar di metricConfig), maka:
+ *     - Asumsikan format: /{metric}/{org}
+ *     - Jalankan perhitungan agregat untuk organisasi tersebut.
+ * - Jika bukan metrik kustom, teruskan seluruh path ke Shields.io sebagai proxy.
+ */
 export default async function handleBadgeRequest(req, res) {
     try {
         const url = new URL(req.url, `http://${req.headers.host}`);
-        const path = url.pathname.replace('/api/badge', '');
+        const path = url.pathname.replace('/api/badge', ''); // hasil: /{metric}/{...}
         const queryString = url.search;
 
-        // Split path menjadi segmen
+        // Ambil segmen pertama (metric)
         const segments = path.split('/').filter(s => s !== '');
-        
-        // Cek apakah ini metrik kustom untuk organisasi: tepat 2 segmen dan metric terdaftar
-        if (segments.length === 2) {
-            const metric = segments[0];
-            const org = segments[1];
-            if (metricConfig.hasOwnProperty(metric)) {
-                await handleCustomOrgMetric(metric, org, req, res);
-                return;
-            }
+        if (segments.length === 0) {
+            throw new Error('Invalid path. Expected /{metric}/...');
         }
 
-        // Selain itu, proxy langsung ke custom-icon-badges (tanpa mengubah path)
+        const metric = segments[0];
+
+        // Cek apakah ini metrik kustom kita (agregat organisasi)
+        if (metricConfig.hasOwnProperty(metric)) {
+            // Metrik kustom hanya mendukung format: /{metric}/{org}
+            if (segments.length < 2) {
+                throw new Error(`Custom metric '${metric}' requires an organization name. Format: /${metric}/{org}`);
+            }
+            const org = segments[1];
+            await handleCustomOrgMetric(metric, org, req, res);
+            return;
+        }
+
+        // Bukan metrik kustom → teruskan sebagai proxy ke Shields.io
         const targetUrl = `${BADGE_SERVICE_BASE}${path}${queryString}`;
-        console.log(`[INFO] Proxying to: ${targetUrl}`);
+        console.log(`[INFO] Proxying to Shields.io: ${targetUrl}`);
         const response = await fetch(targetUrl);
         await pipeResponse(response, res);
+        return;
+
     } catch (error) {
         console.error(`[ERROR] ${error.message}`);
         await sendErrorBadge(res, error, req);
     }
 }
 
+/**
+ * Menangani metrik kustom untuk organisasi (agregat).
+ */
 async function handleCustomOrgMetric(metric, org, req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const excludeParam = url.searchParams.get('exclude');
     const styleParam = url.searchParams.get('style');
 
+    // Validasi bahwa akun adalah organisasi
     if (!await isOrganization(org)) {
         throw new Error(`Account '${org}' is not an organization`);
     }
 
+    // Ambil semua repo (dengan cache 6 jam)
     const allRepos = await fetchAllOrgRepos(org);
     let filteredRepos = allRepos;
     if (excludeParam) {
@@ -79,6 +103,9 @@ async function handleCustomOrgMetric(metric, org, req, res) {
     await pipeResponse(response, res, 'public, max-age=21600');
 }
 
+/**
+ * Meneruskan response dari upstream ke client.
+ */
 async function pipeResponse(upstreamRes, clientRes, customCacheControl = null) {
     const contentType = upstreamRes.headers.get('content-type') || 'image/svg+xml';
     const cacheControl = customCacheControl || upstreamRes.headers.get('cache-control') || 'public, max-age=3600';
@@ -89,6 +116,9 @@ async function pipeResponse(upstreamRes, clientRes, customCacheControl = null) {
     clientRes.send(body);
 }
 
+/**
+ * Mengirim badge error dengan style yang sesuai.
+ */
 async function sendErrorBadge(res, error, req) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const styleParam = url.searchParams.get('style');
@@ -97,7 +127,10 @@ async function sendErrorBadge(res, error, req) {
     let errorMessage = 'Proxy Error';
     let statusCode = 500;
 
-    if (error.message.includes('not found')) {
+    if (error.message.includes('Invalid path')) {
+        errorMessage = 'Invalid Path';
+        statusCode = 400;
+    } else if (error.message.includes('not found')) {
         errorMessage = 'Account Not Found';
         statusCode = 404;
     } else if (error.message.includes('rate limit')) {
@@ -105,6 +138,12 @@ async function sendErrorBadge(res, error, req) {
         statusCode = 429;
     } else if (error.message.includes('not an organization')) {
         errorMessage = 'Not an Organization';
+        statusCode = 400;
+    } else if (error.message.includes('Custom metric')) {
+        errorMessage = 'Invalid Format';
+        statusCode = 400;
+    } else if (error.message.includes('not supported')) {
+        errorMessage = 'Unsupported Metric';
         statusCode = 400;
     }
 
@@ -122,6 +161,7 @@ async function sendErrorBadge(res, error, req) {
         console.error('Failed to fetch error badge:', e.message);
     }
 
+    // Fallback SVG
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Cache-Control', 'no-cache');
     res.status(statusCode).send(`
