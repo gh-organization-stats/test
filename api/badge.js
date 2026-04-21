@@ -1,5 +1,5 @@
-import badge from '../src/badge.js';
+import handleBadgeRequest from '../src/badge/handler.js';
 
 export default async function handler(req, res) {
-    return badge(req, res);
+    return handleBadgeRequest(req, res);
 }
