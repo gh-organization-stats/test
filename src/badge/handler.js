@@ -10,7 +10,7 @@ import { formatNumber, formatSize } from '../lib/formatters.js';
  * - /api/badge/{metric}/{owner}          -> agregat organisasi (jika metric custom) atau proxy ke Shields.io
  * - /api/badge/{metric}/{owner}/{repo}   -> repositori spesifik (proxy ke Shields.io)
  */
-export async function handleBadgeRequest(req, res) {
+export default async function handleBadgeRequest(req, res) {
     try {
         const url = new URL(req.url, `http://${req.headers.host}`);
         const path = url.pathname.replace('/api/badge', ''); // hasil: /{metric}/{owner}[/{repo}]
