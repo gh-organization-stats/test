@@ -222,7 +222,6 @@ async function aggregateAll(repos, fetchFn) {
 
 // --- Konfigurasi tampilan badge (tanpa logo default) ---
 export const metricConfig = {
-    stars:          { label: 'Total Stars', color: 'yellow' },
     forks:          { label: 'Total Forks', color: 'blue' },
     watchers:       { label: 'Total Watchers', color: 'orange' },
     size:           { label: 'Total Size', color: 'lightgrey' },
