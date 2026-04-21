@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import { BADGE_SERVICE_BASE } from '../config.js';
-import { isOrganization, fetchAllOrgRepos } from '../github/api.js';
+import { fetchAllOrgRepos } from '../github/api.js';
 import { calculateOrgStats, metricConfig } from '../github/org-stats.js';
 import { formatNumber, formatSize } from '../lib/formatters.js';
 
@@ -11,8 +11,8 @@ import { formatNumber, formatSize } from '../lib/formatters.js';
  * - Ambil seluruh path setelah /api/badge (misal: /stars/vercel/next.js)
  * - Ambil segmen pertama sebagai 'metric'.
  * - Jika metric adalah metrik kustom kita (terdaftar di metricConfig), maka:
- *     - Asumsikan format: /{metric}/{org}
- *     - Jalankan perhitungan agregat untuk organisasi tersebut.
+ *     - Asumsikan format: /{metric}/{owner}
+ *     - Jalankan perhitungan agregat untuk akun tersebut (bisa user atau org).
  * - Jika bukan metrik kustom, tambahkan prefix '/github' dan teruskan ke Shields.io.
  */
 export default async function handleBadgeRequest(req, res) {
@@ -29,14 +29,14 @@ export default async function handleBadgeRequest(req, res) {
 
         const metric = segments[0];
 
-        // Cek apakah ini metrik kustom kita (agregat organisasi)
+        // Cek apakah ini metrik kustom kita (agregat akun)
         if (metricConfig.hasOwnProperty(metric)) {
-            // Metrik kustom hanya mendukung format: /{metric}/{org}
+            // Metrik kustom hanya mendukung format: /{metric}/{owner}
             if (segments.length < 2) {
-                throw new Error(`Custom metric '${metric}' requires an organization name. Format: /${metric}/{org}`);
+                throw new Error(`Custom metric '${metric}' requires an owner name. Format: /${metric}/{owner}`);
             }
-            const org = segments[1];
-            await handleCustomOrgMetric(metric, org, req, res);
+            const owner = segments[1];
+            await handleCustomMetric(metric, owner, req, res);
             return;
         }
 
@@ -58,20 +58,15 @@ export default async function handleBadgeRequest(req, res) {
 }
 
 /**
- * Menangani metrik kustom untuk organisasi (agregat).
+ * Menangani metrik kustom untuk agregat akun (user atau organisasi).
  */
-async function handleCustomOrgMetric(metric, org, req, res) {
+async function handleCustomMetric(metric, owner, req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const excludeParam = url.searchParams.get('exclude');
     const styleParam = url.searchParams.get('style');
 
-    // Validasi bahwa akun adalah organisasi
-    if (!await isOrganization(org)) {
-        throw new Error(`Account '${org}' is not an organization`);
-    }
-
-    // Ambil semua repo (dengan cache 6 jam)
-    const allRepos = await fetchAllOrgRepos(org);
+    // Ambil semua repo publik milik owner (cache 6 jam)
+    const allRepos = await fetchAllOrgRepos(owner);
     let filteredRepos = allRepos;
     if (excludeParam) {
         const excludeList = excludeParam.split(',').map(s => s.trim().toLowerCase());
@@ -83,7 +78,8 @@ async function handleCustomOrgMetric(metric, org, req, res) {
         console.log(`[INFO] Excluded: ${excludeList.join(', ')}. Remaining: ${filteredRepos.length}`);
     }
 
-    const { value, extraData } = await calculateOrgStats(filteredRepos, metric, org);
+    // Hitung metrik
+    const { value, extraData } = await calculateOrgStats(filteredRepos, metric, owner);
     const config = metricConfig[metric];
 
     let message = value;
@@ -96,6 +92,7 @@ async function handleCustomOrgMetric(metric, org, req, res) {
         message += ` (${extraData.count} repos)`;
     }
 
+    // Bangun badge
     const badgePath = `/badge/${encodeURIComponent(config.label)}-${encodeURIComponent(message)}-${config.color}`;
     const params = new URLSearchParams();
     if (styleParam) params.set('style', styleParam);
@@ -140,9 +137,6 @@ async function sendErrorBadge(res, error, req) {
     } else if (error.message.includes('rate limit')) {
         errorMessage = 'Rate Limit Exceeded';
         statusCode = 429;
-    } else if (error.message.includes('not an organization')) {
-        errorMessage = 'Not an Organization';
-        statusCode = 400;
     } else if (error.message.includes('Custom metric')) {
         errorMessage = 'Invalid Format';
         statusCode = 400;
