@@ -1,9 +1,19 @@
-// src/stats/renderer.js
-import { formatNumber, formatSize, wrapText } from '../lib/formatters.js';
+import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 
-// --- Helpers ---
+// --- Konstanta & Helper ---
+const CARD_MIN_WIDTH = 287;
+const CARD_DEFAULT_WIDTH = 287;
+const RANK_CARD_MIN_WIDTH = 420;
+const RANK_CARD_DEFAULT_WIDTH = 450;
+const RANK_ONLY_CARD_MIN_WIDTH = 290;
+const RANK_ONLY_CARD_DEFAULT_WIDTH = 290;
+const PADDING = 25;
+const LINE_HEIGHT = 26;
+const TITLE_FONT_SIZE = 18;
+const METRIC_FONT_SIZE = 13;
+
 function cleanColor(color) {
     if (!color) return 'ffffff';
     let cleaned = String(color).trim().replace(/^#/, '');
@@ -12,31 +22,47 @@ function cleanColor(color) {
 }
 const colorAttr = (c) => `#${cleanColor(c)}`;
 
-// Estimasi lebar teks (13px Segoe UI)
-const CHAR_WIDTH = 7.2;
-function measureTextWidth(text) {
-    return text.length * CHAR_WIDTH;
+// Layout flex vertikal
+function flexLayout({ items, gap, direction }) {
+    if (direction !== "column") {
+        console.warn("flexLayout hanya mendukung arah 'column' untuk layout vertikal.");
+        return items;
+    }
+    return items.map((item, index) => {
+        return `<g transform="translate(0, ${index * gap})">${item}</g>`;
+    });
 }
 
-// Konstanta layout
-const PADDING = 25;
-const TITLE_FONT_SIZE = 18;
-const METRIC_FONT_SIZE = 13;
-const LINE_HEIGHT = 26;
-const RANK_RADIUS = 32;
-const RANK_STROKE = 5;
-const ICON_SIZE = 16;
-const ICON_SPACING = 6;
+// --- Definisi Metrik ---
+const METRIC_DEFS = {
+    totalStars: { label: 'Total Stars', icon: 'star' },
+    totalForks: { label: 'Total Forks', icon: 'repo-forked' },
+    totalCommits: { label: 'Total Commits', icon: 'git-commit' },
+    openPRs: { label: 'Open PRs', icon: 'git-pull-request' },
+    openIssues: { label: 'Open Issues', icon: 'issue-opened' },
+    publicRepos: { label: 'Public Repos', icon: 'repo' },
+    totalSize: { label: 'Total Size', icon: 'database' },
+    members: { label: 'Members', icon: 'person' },
+    followers: { label: 'Followers', icon: 'people' },
+    topLanguage: { label: 'Top Language', icon: 'code' },
+    languagesCount: { label: 'Languages', icon: 'code-square' },
+    totalWatchers: { label: 'Total Watchers', icon: 'eye' },
+};
 
+// --- Fungsi Render Utama ---
 export function renderStatsCard(stats, options = {}) {
     const theme = themes[options.theme] || themes.default;
     const hide = new Set((options.hide || '').split(',').filter(Boolean));
+    const show = new Set((options.show || '').split(',').filter(Boolean));
     const showIcons = options.show_icons === 'true';
     const hideRank = options.hide_rank === 'true';
     const disableAnimations = options.disable_animations === 'true';
     const customTitle = options.custom_title || stats.displayName || stats.name;
     const hideBorder = options.hide_border === 'true';
     const borderRadius = options.border_radius || '4.5';
+    const card_width = options.card_width ? parseInt(options.card_width) : null;
+    const number_format = options.number_format || 'short';
+    const locale = options.locale || 'en';
 
     // Warna
     const titleColor = cleanColor(options.title_color || theme.titleColor);
@@ -57,61 +83,76 @@ export function renderStatsCard(stats, options = {}) {
     }
     const bgColor = cleanColor(rawBgColor);
 
-    // --- Metrik yang ditampilkan ---
-    const metricDefs = [
-        { key: 'totalStars', label: 'Total Stars', value: stats.totalStars, format: formatNumber, icon: 'star' },
-        { key: 'totalForks', label: 'Total Forks', value: stats.totalForks, format: formatNumber, icon: 'repo-forked' },
-        { key: 'totalCommits', label: 'Total Commits', value: stats.totalCommits, format: formatNumber, icon: 'git-commit' },
-        { key: 'openPRs', label: 'Open PRs', value: stats.openPRs, format: formatNumber, icon: 'git-pull-request' },
-        { key: 'openIssues', label: 'Open Issues', value: stats.openIssues, format: formatNumber, icon: 'issue-opened' },
-        { key: 'publicRepos', label: 'Public Repos', value: stats.publicRepos, format: formatNumber, icon: 'repo' },
-        { key: 'totalSize', label: 'Total Size', value: stats.totalSize, format: formatSize, icon: 'database' },
-        { key: 'members', label: 'Members', value: stats.members, format: formatNumber, icon: 'person' },
-        { key: 'followers', label: 'Followers', value: stats.followers, format: formatNumber, icon: 'people' },
-        { key: 'topLanguage', label: 'Top Language', value: stats.topLanguage, format: (v) => v, icon: 'code' },
-        { key: 'languagesCount', label: 'Languages', value: stats.languagesCount, format: formatNumber, icon: 'code-square' },
-        { key: 'totalWatchers', label: 'Total Watchers', value: stats.totalWatchers, format: formatNumber, icon: 'eye' }
-    ];
-
-    const visibleMetrics = metricDefs.filter(m => !hide.has(m.key));
-    const metricsCount = visibleMetrics.length;
-
-    // Format semua nilai terlebih dahulu
-    const formattedValues = visibleMetrics.map(m => m.format(m.value));
-
-    // Hitung lebar konten maksimum (label + nilai)
-    let maxContentWidth = 0;
-    for (let i = 0; i < visibleMetrics.length; i++) {
-        const labelWidth = measureTextWidth(visibleMetrics[i].label + ': ');
-        const valueWidth = measureTextWidth(formattedValues[i]);
-        const iconWidth = showIcons ? ICON_SIZE + ICON_SPACING : 0;
-        const total = labelWidth + valueWidth + iconWidth;
-        if (total > maxContentWidth) maxContentWidth = total;
+    // --- Kumpulkan metrik yang akan ditampilkan ---
+    const statItems = [];
+    for (const [key, def] of Object.entries(METRIC_DEFS)) {
+        if (hide.has(key)) continue; // 1. Abaikan jika di-hide
+        
+        // 2. Metrik dasar selalu tampil, kecuali di-hide
+        const isCoreMetric = ['totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'].includes(key);
+        if (isCoreMetric || show.has(key)) {
+            let value = stats[key];
+            if (value === undefined) continue;
+            
+            let formattedValue;
+            if (key === 'totalSize') formattedValue = formatSize(value);
+            else if (key === 'topLanguage') formattedValue = value;
+            else formattedValue = formatNumber(value);
+            
+            statItems.push({
+                key, label: def.label, value: formattedValue, icon: def.icon
+            });
+        }
     }
 
-    // Lebar kartu = konten + padding kiri/kanan + ruang untuk rank circle jika ada
-    let cardWidth = Math.max(
-        options.card_width ? parseInt(options.card_width) : 0,
-        maxContentWidth + 2 * PADDING + (hideRank ? 0 : RANK_RADIUS * 2 + 20),
-        350
-    );
+    // --- Buat node teks untuk setiap item ---
+    const createTextNode = (item, index) => {
+        const iconSvg = showIcons && item.icon && octiconPaths[item.icon]
+            ? `<g transform="translate(0, -3)" fill="${colorAttr(iconColor)}"><path d="${octiconPaths[item.icon]}" fill-rule="evenodd"/></g>`
+            : '';
+        const labelX = showIcons ? '25' : '0';
+        const valueX = '200'; // Posisi nilai akan dihitung ulang
+        
+        return `
+            <g transform="translate(${PADDING}, ${index * LINE_HEIGHT})">
+                ${iconSvg}
+                <text x="${labelX}" y="0" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="${METRIC_FONT_SIZE}" fill="${colorAttr(textColor)}">${escapeXml(item.label)}:</text>
+                <text x="${valueX}" y="0" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="${METRIC_FONT_SIZE}" font-weight="bold" fill="${colorAttr(textColor)}">${escapeXml(item.value)}</text>
+            </g>
+        `;
+    };
 
-    // Judul dan tinggi
-    const maxTitleWidth = cardWidth - 2 * PADDING - (hideRank ? 0 : RANK_RADIUS * 2 + 10);
-    const titleLines = wrapText(customTitle, maxTitleWidth, TITLE_FONT_SIZE);
+    const statNodes = statItems.map((item, index) => createTextNode(item, index));
+    
+    // Hitung lebar konten terpanjang
+    let maxContentWidth = 0;
+    statItems.forEach(item => {
+        const labelWidth = measureTextWidth(item.label + ': ', METRIC_FONT_SIZE);
+        const valueWidth = measureTextWidth(item.value, METRIC_FONT_SIZE);
+        const iconWidth = showIcons ? 25 : 0;
+        maxContentWidth = Math.max(maxContentWidth, labelWidth + valueWidth + iconWidth);
+    });
+    
+    const titleWidth = measureTextWidth(customTitle, TITLE_FONT_SIZE);
+    maxContentWidth = Math.max(maxContentWidth, titleWidth);
+    
+    // Hitung lebar kartu
+    const iconWidth = showIcons && statItems.length ? 16 + 1 : 0;
+    let minCardWidth = hideRank ? Math.max(50 + maxContentWidth, CARD_MIN_WIDTH) : (statItems.length ? RANK_CARD_MIN_WIDTH : RANK_ONLY_CARD_MIN_WIDTH) + iconWidth;
+    let defaultCardWidth = hideRank ? CARD_DEFAULT_WIDTH : (statItems.length ? RANK_CARD_DEFAULT_WIDTH : RANK_ONLY_CARD_DEFAULT_WIDTH) + iconWidth;
+    let width = card_width || defaultCardWidth;
+    if (width < minCardWidth) width = minCardWidth;
+    
+    // Hitung tinggi kartu
+    const titleLines = wrapText(customTitle, width - 2 * PADDING - (hideRank ? 0 : 70), TITLE_FONT_SIZE);
     const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
     const statsStartY = PADDING + titleHeight + 15;
-    const statsHeight = Math.ceil(metricsCount / 2) * LINE_HEIGHT;
-    const cardHeight = statsStartY + statsHeight + PADDING;
-
-    // Posisi rank circle
-    const rankCircleX = cardWidth - PADDING - RANK_RADIUS;
-    const rankCircleY = PADDING + TITLE_FONT_SIZE;
-
+    let height = Math.max(45 + (statItems.length + 1) * LINE_HEIGHT, hideRank ? 0 : statItems.length ? 150 : 180);
+    
     // --- Bangun SVG ---
     const svgParts = [];
-    svgParts.push(`<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Organization Stats Card">`);
-
+    svgParts.push(`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Organization Stats Card">`);
+    
     // Defs
     if (isGradient) {
         svgParts.push(`<defs><linearGradient id="${gradientId}" gradientTransform="rotate(${gradientAngle})">`);
@@ -121,76 +162,48 @@ export function renderStatsCard(stats, options = {}) {
         });
         svgParts.push(`</linearGradient></defs>`);
     }
-
+    
     // Animasi
     if (!disableAnimations && !hideRank && stats.rank) {
-        const circ = 2 * Math.PI * RANK_RADIUS;
-        const target = circ * (1 - (stats.rank.percentile || 0) / 100);
+        const circ = 2 * Math.PI * 40; // radius 40
+        const target = ((100 - (stats.rank.percentile || 0)) / 100) * circ;
         svgParts.push(`<style>@keyframes rank{from{stroke-dashoffset:${circ}}to{stroke-dashoffset:${target}}}.rank-circle{animation:rank 1s ease forwards}</style>`);
     }
-
+    
     // Background
     const bgFill = isGradient ? `url(#${gradientId})` : colorAttr(bgColor);
     if (!hideBorder) {
-        svgParts.push(`<rect width="${cardWidth}" height="${cardHeight}" rx="${borderRadius}" fill="${bgFill}" stroke="${colorAttr(borderColor)}" stroke-width="2"/>`);
+        svgParts.push(`<rect width="${width}" height="${height}" rx="${borderRadius}" fill="${bgFill}" stroke="${colorAttr(borderColor)}" stroke-width="2"/>`);
     } else {
-        svgParts.push(`<rect width="${cardWidth}" height="${cardHeight}" rx="${borderRadius}" fill="${bgFill}"/>`);
+        svgParts.push(`<rect width="${width}" height="${height}" rx="${borderRadius}" fill="${bgFill}"/>`);
     }
-
+    
     // Judul
     let titleY = PADDING + TITLE_FONT_SIZE;
     titleLines.forEach(line => {
         svgParts.push(`<text x="${PADDING}" y="${titleY}" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="${TITLE_FONT_SIZE}" font-weight="bold" fill="${colorAttr(titleColor)}">${escapeXml(line)}</text>`);
         titleY += TITLE_FONT_SIZE + 4;
     });
-
+    
     // Rank Circle
     if (!hideRank && stats.rank) {
         const rank = stats.rank;
-        const circ = 2 * Math.PI * RANK_RADIUS;
-        const progress = circ * (1 - rank.percentile / 100);
-        svgParts.push(`<circle cx="${rankCircleX}" cy="${rankCircleY}" r="${RANK_RADIUS}" fill="none" stroke="${colorAttr(borderColor)}" stroke-width="${RANK_STROKE}" opacity="0.2"/>`);
-        svgParts.push(`<circle cx="${rankCircleX}" cy="${rankCircleY}" r="${RANK_RADIUS}" fill="none" stroke="${colorAttr(ringColor)}" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? progress : circ}" class="rank-circle" stroke-linecap="round" transform="rotate(-90 ${rankCircleX} ${rankCircleY})"/>`);
+        const rankCircleX = width - PADDING - 40;
+        const rankCircleY = PADDING + TITLE_FONT_SIZE;
+        const circ = 2 * Math.PI * 40;
+        const progress = ((100 - rank.percentile) / 100) * circ;
+        svgParts.push(`<circle cx="${rankCircleX}" cy="${rankCircleY}" r="40" fill="none" stroke="${colorAttr(borderColor)}" stroke-width="5" opacity="0.2"/>`);
+        svgParts.push(`<circle cx="${rankCircleX}" cy="${rankCircleY}" r="40" fill="none" stroke="${colorAttr(ringColor)}" stroke-width="5" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? progress : circ}" class="rank-circle" stroke-linecap="round" transform="rotate(-90 ${rankCircleX} ${rankCircleY})"/>`);
         svgParts.push(`<text x="${rankCircleX}" y="${rankCircleY - 4}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="14" font-weight="bold" fill="${colorAttr(textColor)}">${rank.level || 'C+'}</text>`);
         svgParts.push(`<text x="${rankCircleX}" y="${rankCircleY + 14}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="9" fill="${colorAttr(textColor)}">${rank.percentile}%</text>`);
     }
-
-    // Metrik dalam dua kolom
-    const colSpacing = 30;
-    const colWidth = (cardWidth - 2 * PADDING - (hideRank ? 0 : 60) - colSpacing) / 2;
-    const leftX = PADDING;
-    const rightX = PADDING + colWidth + colSpacing;
-
-    let yPos = statsStartY;
-    for (let i = 0; i < metricsCount; i += 2) {
-        const left = visibleMetrics[i];
-        const right = visibleMetrics[i + 1];
-
-        if (left) {
-            renderMetricToParts(svgParts, left, leftX, yPos, formattedValues[i], showIcons, iconColor, textColor);
-        }
-        if (right) {
-            renderMetricToParts(svgParts, right, rightX, yPos, formattedValues[i+1], showIcons, iconColor, textColor);
-        }
-        yPos += LINE_HEIGHT;
-    }
-
+    
+    // Render semua metrik dalam layout kolom
+    const statsSvg = flexLayout({ items: statNodes, gap: LINE_HEIGHT, direction: "column" }).join('');
+    svgParts.push(`<g transform="translate(0, ${statsStartY})">${statsSvg}</g>`);
+    
     svgParts.push(`</svg>`);
     return svgParts.join('');
-}
-
-function renderMetricToParts(parts, metric, x, y, valueStr, showIcons, iconColor, textColor) {
-    const iconOffset = showIcons && metric.icon ? ICON_SIZE + ICON_SPACING : 0;
-    const textX = x + iconOffset;
-    if (showIcons && metric.icon && octiconPaths[metric.icon]) {
-        parts.push(`<g transform="translate(${x}, ${y - 11})" fill="${colorAttr(iconColor)}">`);
-        parts.push(`<path d="${octiconPaths[metric.icon]}" fill-rule="evenodd"/>`);
-        parts.push(`</g>`);
-    }
-    parts.push(`<text x="${textX}" y="${y}" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="${METRIC_FONT_SIZE}" fill="${colorAttr(textColor)}">${escapeXml(metric.label)}:</text>`);
-    // Nilai di ujung kanan kolom (x + colWidth)
-    const valueX = x + 180; // gunakan lebar kolom yang lebih akurat
-    parts.push(`<text x="${valueX}" y="${y}" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="${METRIC_FONT_SIZE}" font-weight="bold" fill="${colorAttr(textColor)}">${escapeXml(valueStr)}</text>`);
 }
 
 function escapeXml(unsafe) {
