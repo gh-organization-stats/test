@@ -72,6 +72,25 @@ export const themes = {
         iconColor: '#ff9d00',
         borderColor: '#0b2b3b',
         ringColor: '#ffc600'
+    },
+    // Gradient themes (sama dengan github-readme-stats)
+    ambient_gradient: {
+        name: 'Ambient Gradient',
+        bgColor: '35,4158d0,c850c0,ffcc70',
+        titleColor: 'ffffff',
+        textColor: 'ffffff',
+        iconColor: 'ffffff',
+        borderColor: 'ffffff',
+        ringColor: 'ffffff'
+    },
+    synthwave: {
+        name: 'Synthwave',
+        bgColor: '45,ff007f,7f00ff',
+        titleColor: 'ffffff',
+        textColor: 'ffffff',
+        iconColor: 'ffffff',
+        borderColor: 'ffffff',
+        ringColor: 'ffffff'
     }
 };
 
