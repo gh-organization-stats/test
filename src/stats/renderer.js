@@ -4,8 +4,6 @@ import { octiconPaths } from './icons.js';
 
 /**
  * Membersihkan dan menstandarkan format warna.
- * Menerima: '#fff', 'fff', 'ffffff', '#ffffff'
- * Mengembalikan: 'ffffff' (tanpa #)
  */
 function cleanColor(color) {
     if (!color) return 'ffffff';
@@ -19,9 +17,6 @@ function cleanColor(color) {
     return cleaned.toLowerCase();
 }
 
-/**
- * Menambahkan '#' di depan jika diperlukan untuk atribut SVG.
- */
 function colorAttr(color) {
     return `#${cleanColor(color)}`;
 }
@@ -34,17 +29,17 @@ export function renderStatsCard(stats, options = {}) {
     const disableAnimations = options.disable_animations === 'true';
     const customTitle = options.custom_title || stats.displayName || stats.name;
 
-    // Konfigurasi layout standar
-    const cardWidth = options.card_width ? parseInt(options.card_width) : (hideRank ? 350 : 495);
+    // Konfigurasi layout
+    const cardWidth = options.card_width ? parseInt(options.card_width) : 495;
     const lineHeight = options.line_height ? parseInt(options.line_height) : 25;
     const padding = 25;
     const titleY = 45;
     const borderRadius = options.border_radius || '4.5';
     
-    // Posisi lingkaran rank (mirip dengan github-readme-stats)
-    const rankCircleX = cardWidth - 65;
+    // Rank circle
+    const rankCircleX = cardWidth - 60;
     const rankCircleY = 55;
-    const rankCircleRadius = 35;
+    const rankCircleRadius = 32;
     const rankCircleStrokeWidth = 5;
 
     // Warna
@@ -83,7 +78,7 @@ export function renderStatsCard(stats, options = {}) {
     const metricDefs = [
         { key: 'totalStars', label: 'Total Stars', value: stats.totalStars, format: formatNumber, icon: 'star' },
         { key: 'totalForks', label: 'Total Forks', value: stats.totalForks, format: formatNumber, icon: 'repo-forked' },
-        { key: 'totalCommits', label: 'Total Commits', value: stats.totalCommits, format: formatNumber, icon: 'git-commit' }, // <-- BARU
+        { key: 'totalCommits', label: 'Total Commits', value: stats.totalCommits, format: formatNumber, icon: 'git-commit' },
         { key: 'openPRs', label: 'Open PRs', value: stats.openPRs, format: formatNumber, icon: 'git-pull-request' },
         { key: 'openIssues', label: 'Open Issues', value: stats.openIssues, format: formatNumber, icon: 'issue-opened' },
         { key: 'publicRepos', label: 'Public Repos', value: stats.publicRepos, format: formatNumber, icon: 'repo' },
@@ -99,9 +94,9 @@ export function renderStatsCard(stats, options = {}) {
     const visibleMetricsCount = visibleMetrics.length;
 
     // Hitung tinggi kartu
-    const titleLines = wrapText(customTitle, cardWidth - 2 * padding - (hideRank ? 0 : 50), 18);
+    const titleLines = wrapText(customTitle, cardWidth - 2 * padding - (hideRank ? 0 : 70), 18);
     const titleHeight = titleLines.length * 22;
-    const statsStartY = titleY + titleHeight + 15;
+    const statsStartY = titleY + titleHeight + 20;
     const statsHeight = visibleMetricsCount * lineHeight;
     const cardHeight = statsStartY + statsHeight + padding;
 
@@ -122,7 +117,7 @@ export function renderStatsCard(stats, options = {}) {
 
     if (!disableAnimations) {
         svg += `<style>`;
-        svg += `@keyframes rankAnimation { from { stroke-dashoffset: 251.2; } to { stroke-dashoffset: ${251.2 * (1 - (stats.rank?.percentile || 0) / 100)}; } }`;
+        svg += `@keyframes rankAnimation { from { stroke-dashoffset: 201; } to { stroke-dashoffset: ${201 * (1 - (stats.rank?.percentile || 0) / 100)}; } }`;
         svg += `.rank-circle { animation: rankAnimation 1s ease-in-out forwards; }`;
         svg += `</style>`;
     }
@@ -142,66 +137,50 @@ export function renderStatsCard(stats, options = {}) {
         currentTitleY += 22;
     }
 
-    // === LINGKARAN RANK (jika tidak disembunyikan) ===
+    // === RANK CIRCLE (jika tidak disembunyikan) ===
     if (!hideRank && stats.rank) {
         const rank = stats.rank;
         const percentile = rank.percentile || 0;
         const circumference = 2 * Math.PI * rankCircleRadius;
         const progress = circumference * (1 - percentile / 100);
         
-        // Lingkaran latar (abu-abu)
+        // Lingkaran latar
         svg += `<circle cx="${rankCircleX}" cy="${rankCircleY}" r="${rankCircleRadius}" fill="none" stroke="#${borderColor}" stroke-width="${rankCircleStrokeWidth}" opacity="0.2"/>`;
-        // Lingkaran progress
+        // Lingkaran progress dengan animasi
         svg += `<circle cx="${rankCircleX}" cy="${rankCircleY}" r="${rankCircleRadius}" fill="none" stroke="#${ringColor}" stroke-width="${rankCircleStrokeWidth}" stroke-dasharray="${circumference}" stroke-dashoffset="${disableAnimations ? progress : circumference}" class="${disableAnimations ? '' : 'rank-circle'}" stroke-linecap="round" transform="rotate(-90 ${rankCircleX} ${rankCircleY})"/>`;
         
         // Teks rank
-        svg += `<text x="${rankCircleX}" y="${rankCircleY - 5}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="16" font-weight="bold" fill="#${textColor}">${rank.level || 'C+'}</text>`;
-        svg += `<text x="${rankCircleX}" y="${rankCircleY + 15}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="10" fill="#${textColor}">${percentile}%</text>`;
+        svg += `<text x="${rankCircleX}" y="${rankCircleY - 4}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="14" font-weight="bold" fill="#${textColor}">${rank.level || 'C+'}</text>`;
+        svg += `<text x="${rankCircleX}" y="${rankCircleY + 14}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="9" fill="#${textColor}">${percentile}%</text>`;
     }
 
-    // === METRIK (Dua Kolom) ===
+    // === METRIK (Layout Vertikal) ===
     let yPos = statsStartY;
-    const colWidth = (cardWidth - 2 * padding - (hideRank ? 0 : 50)) / 2;
-    const leftColX = padding;
-    const rightColX = padding + colWidth + (hideRank ? 0 : 25);
+    const iconOffset = showIcons ? 20 : 0;
+    const textX = padding + iconOffset;
 
-    for (let i = 0; i < visibleMetricsCount; i += 2) {
-        const leftMetric = visibleMetrics[i];
-        const rightMetric = visibleMetrics[i + 1];
-        
-        // Render metrik kiri
-        if (leftMetric) {
-            svg += renderMetric(leftMetric, leftColX, yPos, showIcons, iconColor, textColor);
+    for (const metric of visibleMetrics) {
+        const formattedValue = metric.format(metric.value);
+
+        // Ikon
+        if (showIcons && metric.icon && octiconPaths[metric.icon]) {
+            const iconPath = octiconPaths[metric.icon];
+            const iconY = yPos - 11;
+            svg += `<g transform="translate(${padding}, ${iconY})" fill="#${iconColor}">`;
+            svg += `<path d="${iconPath}" fill-rule="evenodd"/>`;
+            svg += `</g>`;
         }
-        
-        // Render metrik kanan
-        if (rightMetric) {
-            svg += renderMetric(rightMetric, rightColX, yPos, showIcons, iconColor, textColor);
-        }
-        
+
+        // Label
+        svg += `<text x="${textX}" y="${yPos}" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="13" fill="#${textColor}">${escapeXml(metric.label)}:</text>`;
+        // Nilai (rata kanan, dengan lebar maksimum tersisa)
+        const maxValueWidth = cardWidth - padding - textX - 20;
+        svg += `<text x="${cardWidth - padding}" y="${yPos}" text-anchor="end" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="13" font-weight="bold" fill="#${textColor}">${escapeXml(formattedValue)}</text>`;
+
         yPos += lineHeight;
     }
 
     svg += `</svg>`;
-    return svg;
-}
-
-function renderMetric(metric, x, y, showIcons, iconColor, textColor) {
-    let svg = '';
-    const formattedValue = metric.format(metric.value);
-    const iconOffset = showIcons && metric.icon ? 20 : 0;
-    const textX = x + iconOffset;
-
-    if (showIcons && metric.icon && octiconPaths[metric.icon]) {
-        const iconPath = octiconPaths[metric.icon];
-        const iconY = y - 11;
-        svg += `<g transform="translate(${x}, ${iconY})" fill="#${iconColor}">`;
-        svg += `<path d="${iconPath}" fill-rule="evenodd"/>`;
-        svg += `</g>`;
-    }
-
-    svg += `<text x="${textX}" y="${y}" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="13" fill="#${textColor}">${escapeXml(metric.label)}:</text>`;
-    svg += `<text x="${x + 180}" y="${y}" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="13" font-weight="bold" fill="#${textColor}">${escapeXml(formattedValue)}</text>`;
     return svg;
 }
 
