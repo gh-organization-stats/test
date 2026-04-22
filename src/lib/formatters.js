@@ -61,13 +61,31 @@ export function wrapText(text, maxWidth, fontSize) {
 }
 
 /**
- * Estimasi lebar teks dalam piksel (untuk perhitungan layout SVG).
- * @param {string} text - Teks yang diukur
- * @param {number} fontSize - Ukuran font (px)
- * @returns {number} - Estimasi lebar
+ * Estimasi lebar teks dengan mempertimbangkan karakter lebar dan sempit.
+ * Menggunakan tabel lebar karakter sederhana untuk akurasi yang lebih baik.
  */
-export function measureTextWidth(text, fontSize = 13) {
+const CHAR_WIDTH_MAP = {
+    // Karakter lebar penuh (umumnya huruf besar, angka, simbol tertentu)
+    WIDE: 1.0,
+    // Karakter sempit (huruf kecil, spasi, titik, dll.)
+    NARROW: 0.6
+};
+
+function getCharWidth(char) {
+    // Karakter yang cenderung lebih lebar
+    if (/[A-Z0-9@#%&*()+=?<>{}[\]|]/.test(char)) {
+        return CHAR_WIDTH_MAP.WIDE;
+    }
+    // Karakter sempit termasuk huruf kecil, spasi, tanda baca
+    return CHAR_WIDTH_MAP.NARROW;
+}
+
+export function measureTextWidth(text, fontSize) {
     if (!text) return 0;
-    const avgCharWidth = fontSize * 0.6; // Rata-rata karakter proporsional
-    return String(text).length * avgCharWidth;
+    const avgWidthPerChar = fontSize * 0.55; // Rata-rata proporsional
+    let totalWidth = 0;
+    for (const char of String(text)) {
+        totalWidth += getCharWidth(char) * fontSize * 0.55;
+    }
+    return totalWidth;
 }
