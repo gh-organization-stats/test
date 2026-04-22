@@ -1,35 +1,71 @@
-// src/stats/renderer.js
 import { formatNumber, formatSize, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
+
+/**
+ * Membersihkan dan menstandarkan format warna.
+ * Menerima: '#fff', 'fff', 'ffffff', '#ffffff'
+ * Mengembalikan: 'ffffff' (tanpa #)
+ */
+function cleanColor(color) {
+    if (!color) return 'ffffff';
+    // Hapus spasi dan #
+    let cleaned = String(color).trim().replace(/^#/, '');
+    // Jika hanya 3 karakter, ekspansi ke 6 (misal 'fff' -> 'ffffff')
+    if (cleaned.length === 3) {
+        cleaned = cleaned.split('').map(c => c + c).join('');
+    }
+    // Jika bukan hex valid, kembalikan default
+    if (!/^[0-9A-Fa-f]{6}$/.test(cleaned)) {
+        return 'ffffff';
+    }
+    return cleaned.toLowerCase();
+}
+
+/**
+ * Menambahkan '#' di depan jika diperlukan untuk atribut SVG.
+ */
+function colorAttr(color) {
+    return `#${cleanColor(color)}`;
+}
 
 export function renderStatsCard(stats, options = {}) {
     const theme = themes[options.theme] || themes.default;
     const hide = options.hide ? new Set(options.hide.split(',')) : new Set();
     const showIcons = options.show_icons === 'true' || options.show_icons === true;
-    
-    // Override warna dengan parameter custom (seperti github-readme-stats)
-    const bgColor = options.bg_color || theme.bgColor;
-    const titleColor = options.title_color || theme.titleColor;
-    const textColor = options.text_color || theme.textColor;
-    const iconColor = options.icon_color || theme.iconColor;
-    const borderColor = options.border_color || theme.borderColor;
-    const ringColor = options.ring_color || theme.ringColor;
+
+    // Ambil warna dari opsi atau tema, lalu bersihkan
+    const rawBgColor = options.bg_color || theme.bgColor;
+    const rawTitleColor = options.title_color || theme.titleColor;
+    const rawTextColor = options.text_color || theme.textColor;
+    const rawIconColor = options.icon_color || theme.iconColor;
+    const rawBorderColor = options.border_color || theme.borderColor;
+    const rawRingColor = options.ring_color || theme.ringColor;
+
+    const titleColor = cleanColor(rawTitleColor);
+    const textColor = cleanColor(rawTextColor);
+    const iconColor = cleanColor(rawIconColor);
+    const borderColor = cleanColor(rawBorderColor);
+    const ringColor = cleanColor(rawRingColor);
+
     const hideBorder = options.hide_border === 'true';
     const borderRadius = options.border_radius || '10';
 
-    // Deteksi apakah background adalah gradient (format: "angle,color1,color2,...")
-    const isGradient = typeof bgColor === 'string' && bgColor.includes(',');
+    // Deteksi gradient: format "angle,color1,color2,..."
+    let isGradient = false;
     let gradientId = null;
     let gradientAngle = 0;
     let gradientStops = [];
 
-    if (isGradient) {
-        gradientId = `gradient-${Date.now()}`;
-        const parts = bgColor.split(',').map(p => p.trim());
+    if (typeof rawBgColor === 'string' && rawBgColor.includes(',')) {
+        isGradient = true;
+        const parts = rawBgColor.split(',').map(p => p.trim());
         gradientAngle = parseInt(parts[0], 10) || 0;
-        gradientStops = parts.slice(1);
+        gradientStops = parts.slice(1).map(c => cleanColor(c));
+        gradientId = `g${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
     }
+
+    const bgColor = cleanColor(rawBgColor);
 
     // Layout
     const cardWidth = 500;
@@ -38,7 +74,6 @@ export function renderStatsCard(stats, options = {}) {
     const iconOffset = showIcons ? 22 : 0;
     const lineHeight = 28;
 
-    // Metrik
     const metricDefs = [
         { key: 'totalStars', label: 'Total Stars', value: stats.totalStars, format: formatNumber, icon: 'star' },
         { key: 'totalForks', label: 'Total Forks', value: stats.totalForks, format: formatNumber, icon: 'repo-forked' },
@@ -55,15 +90,15 @@ export function renderStatsCard(stats, options = {}) {
 
     const visibleMetrics = metricDefs.filter(m => !hide.has(m.key));
 
-    // Tinggi kartu
-    const titleLineCount = wrapText(stats.displayName || stats.name, cardWidth - 2 * padding, 18).length;
-    const titleHeight = titleLineCount * 22;
+    const displayName = stats.displayName || stats.name;
+    const titleLines = wrapText(displayName, cardWidth - 2 * padding, 18);
+    const titleHeight = titleLines.length * 22;
     const cardHeight = titleY + titleHeight + 10 + (visibleMetrics.length * lineHeight) + padding;
 
     // === MULAI SVG ===
     let svg = `<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Organization Stats Card">`;
 
-    // === DEFS (Gradient & Animasi) ===
+    // === DEFS (Gradient) ===
     if (isGradient) {
         svg += `<defs>`;
         svg += `<linearGradient id="${gradientId}" gradientTransform="rotate(${gradientAngle})">`;
@@ -76,17 +111,14 @@ export function renderStatsCard(stats, options = {}) {
     }
 
     // === BACKGROUND ===
+    const bgFill = isGradient ? `url(#${gradientId})` : `#${bgColor}`;
     if (!hideBorder) {
-        const bgFill = isGradient ? `url(#${gradientId})` : `#${bgColor}`;
         svg += `<rect width="${cardWidth}" height="${cardHeight}" rx="${borderRadius}" fill="${bgFill}" stroke="#${borderColor}" stroke-width="2"/>`;
     } else {
-        const bgFill = isGradient ? `url(#${gradientId})` : `#${bgColor}`;
         svg += `<rect width="${cardWidth}" height="${cardHeight}" rx="${borderRadius}" fill="${bgFill}"/>`;
     }
 
     // === JUDUL ===
-    const displayName = stats.displayName || stats.name;
-    const titleLines = wrapText(displayName, cardWidth - 2 * padding, 18);
     let currentTitleY = titleY;
     for (const line of titleLines) {
         svg += `<text x="${cardWidth / 2}" y="${currentTitleY}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="18" font-weight="bold" fill="#${titleColor}">${escapeXml(line)}</text>`;
