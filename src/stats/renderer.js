@@ -9,13 +9,10 @@ import { octiconPaths } from './icons.js';
  */
 function cleanColor(color) {
     if (!color) return 'ffffff';
-    // Hapus spasi dan #
     let cleaned = String(color).trim().replace(/^#/, '');
-    // Jika hanya 3 karakter, ekspansi ke 6 (misal 'fff' -> 'ffffff')
     if (cleaned.length === 3) {
         cleaned = cleaned.split('').map(c => c + c).join('');
     }
-    // Jika bukan hex valid, kembalikan default
     if (!/^[0-9A-Fa-f]{6}$/.test(cleaned)) {
         return 'ffffff';
     }
@@ -33,8 +30,24 @@ export function renderStatsCard(stats, options = {}) {
     const theme = themes[options.theme] || themes.default;
     const hide = options.hide ? new Set(options.hide.split(',')) : new Set();
     const showIcons = options.show_icons === 'true' || options.show_icons === true;
+    const hideRank = options.hide_rank === 'true';
+    const disableAnimations = options.disable_animations === 'true';
+    const customTitle = options.custom_title || stats.displayName || stats.name;
 
-    // Ambil warna dari opsi atau tema, lalu bersihkan
+    // Konfigurasi layout standar
+    const cardWidth = options.card_width ? parseInt(options.card_width) : (hideRank ? 350 : 495);
+    const lineHeight = options.line_height ? parseInt(options.line_height) : 25;
+    const padding = 25;
+    const titleY = 45;
+    const borderRadius = options.border_radius || '4.5';
+    
+    // Posisi lingkaran rank (mirip dengan github-readme-stats)
+    const rankCircleX = cardWidth - 65;
+    const rankCircleY = 55;
+    const rankCircleRadius = 35;
+    const rankCircleStrokeWidth = 5;
+
+    // Warna
     const rawBgColor = options.bg_color || theme.bgColor;
     const rawTitleColor = options.title_color || theme.titleColor;
     const rawTextColor = options.text_color || theme.textColor;
@@ -49,9 +62,8 @@ export function renderStatsCard(stats, options = {}) {
     const ringColor = cleanColor(rawRingColor);
 
     const hideBorder = options.hide_border === 'true';
-    const borderRadius = options.border_radius || '10';
 
-    // Deteksi gradient: format "angle,color1,color2,..."
+    // Deteksi gradient
     let isGradient = false;
     let gradientId = null;
     let gradientAngle = 0;
@@ -67,13 +79,7 @@ export function renderStatsCard(stats, options = {}) {
 
     const bgColor = cleanColor(rawBgColor);
 
-    // Layout
-    const cardWidth = 500;
-    const padding = 20;
-    const titleY = 50;
-    const iconOffset = showIcons ? 22 : 0;
-    const lineHeight = 28;
-
+    // Metrik
     const metricDefs = [
         { key: 'totalStars', label: 'Total Stars', value: stats.totalStars, format: formatNumber, icon: 'star' },
         { key: 'totalForks', label: 'Total Forks', value: stats.totalForks, format: formatNumber, icon: 'repo-forked' },
@@ -90,16 +96,19 @@ export function renderStatsCard(stats, options = {}) {
     ];
 
     const visibleMetrics = metricDefs.filter(m => !hide.has(m.key));
+    const visibleMetricsCount = visibleMetrics.length;
 
-    const displayName = stats.displayName || stats.name;
-    const titleLines = wrapText(displayName, cardWidth - 2 * padding, 18);
+    // Hitung tinggi kartu
+    const titleLines = wrapText(customTitle, cardWidth - 2 * padding - (hideRank ? 0 : 50), 18);
     const titleHeight = titleLines.length * 22;
-    const cardHeight = titleY + titleHeight + 10 + (visibleMetrics.length * lineHeight) + padding;
+    const statsStartY = titleY + titleHeight + 15;
+    const statsHeight = visibleMetricsCount * lineHeight;
+    const cardHeight = statsStartY + statsHeight + padding;
 
     // === MULAI SVG ===
     let svg = `<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Organization Stats Card">`;
 
-    // === DEFS (Gradient) ===
+    // === DEFS (Gradient & Animasi) ===
     if (isGradient) {
         svg += `<defs>`;
         svg += `<linearGradient id="${gradientId}" gradientTransform="rotate(${gradientAngle})">`;
@@ -109,6 +118,13 @@ export function renderStatsCard(stats, options = {}) {
         });
         svg += `</linearGradient>`;
         svg += `</defs>`;
+    }
+
+    if (!disableAnimations) {
+        svg += `<style>`;
+        svg += `@keyframes rankAnimation { from { stroke-dashoffset: 251.2; } to { stroke-dashoffset: ${251.2 * (1 - (stats.rank?.percentile || 0) / 100)}; } }`;
+        svg += `.rank-circle { animation: rankAnimation 1s ease-in-out forwards; }`;
+        svg += `</style>`;
     }
 
     // === BACKGROUND ===
@@ -122,35 +138,70 @@ export function renderStatsCard(stats, options = {}) {
     // === JUDUL ===
     let currentTitleY = titleY;
     for (const line of titleLines) {
-        svg += `<text x="${cardWidth / 2}" y="${currentTitleY}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="18" font-weight="bold" fill="#${titleColor}">${escapeXml(line)}</text>`;
+        svg += `<text x="${padding}" y="${currentTitleY}" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', Sans-Serif" font-size="18" font-weight="bold" fill="#${titleColor}">${escapeXml(line)}</text>`;
         currentTitleY += 22;
     }
 
-    // === GARIS PEMISAH ===
-    svg += `<line x1="${padding}" y1="${currentTitleY + 5}" x2="${cardWidth - padding}" y2="${currentTitleY + 5}" stroke="#${borderColor}" stroke-width="1"/>`;
+    // === LINGKARAN RANK (jika tidak disembunyikan) ===
+    if (!hideRank && stats.rank) {
+        const rank = stats.rank;
+        const percentile = rank.percentile || 0;
+        const circumference = 2 * Math.PI * rankCircleRadius;
+        const progress = circumference * (1 - percentile / 100);
+        
+        // Lingkaran latar (abu-abu)
+        svg += `<circle cx="${rankCircleX}" cy="${rankCircleY}" r="${rankCircleRadius}" fill="none" stroke="#${borderColor}" stroke-width="${rankCircleStrokeWidth}" opacity="0.2"/>`;
+        // Lingkaran progress
+        svg += `<circle cx="${rankCircleX}" cy="${rankCircleY}" r="${rankCircleRadius}" fill="none" stroke="#${ringColor}" stroke-width="${rankCircleStrokeWidth}" stroke-dasharray="${circumference}" stroke-dashoffset="${disableAnimations ? progress : circumference}" class="${disableAnimations ? '' : 'rank-circle'}" stroke-linecap="round" transform="rotate(-90 ${rankCircleX} ${rankCircleY})"/>`;
+        
+        // Teks rank
+        svg += `<text x="${rankCircleX}" y="${rankCircleY - 5}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="16" font-weight="bold" fill="#${textColor}">${rank.level || 'C+'}</text>`;
+        svg += `<text x="${rankCircleX}" y="${rankCircleY + 15}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="10" fill="#${textColor}">${percentile}%</text>`;
+    }
 
-    // === METRIK ===
-    let yPos = currentTitleY + 25;
-    const textX = padding + iconOffset;
+    // === METRIK (Dua Kolom) ===
+    let yPos = statsStartY;
+    const colWidth = (cardWidth - 2 * padding - (hideRank ? 0 : 50)) / 2;
+    const leftColX = padding;
+    const rightColX = padding + colWidth + (hideRank ? 0 : 25);
 
-    for (const metric of visibleMetrics) {
-        const formattedValue = metric.format(metric.value);
-
-        if (showIcons && metric.icon && octiconPaths[metric.icon]) {
-            const iconPath = octiconPaths[metric.icon];
-            const iconY = yPos - 11;
-            svg += `<g transform="translate(${padding}, ${iconY})" fill="#${iconColor}">`;
-            svg += `<path d="${iconPath}" fill-rule="evenodd"/>`;
-            svg += `</g>`;
+    for (let i = 0; i < visibleMetricsCount; i += 2) {
+        const leftMetric = visibleMetrics[i];
+        const rightMetric = visibleMetrics[i + 1];
+        
+        // Render metrik kiri
+        if (leftMetric) {
+            svg += renderMetric(leftMetric, leftColX, yPos, showIcons, iconColor, textColor);
         }
-
-        svg += `<text x="${textX}" y="${yPos}" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="14" fill="#${textColor}">${escapeXml(metric.label)}:</text>`;
-        svg += `<text x="${cardWidth - padding}" y="${yPos}" text-anchor="end" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="14" font-weight="bold" fill="#${textColor}">${escapeXml(formattedValue)}</text>`;
-
+        
+        // Render metrik kanan
+        if (rightMetric) {
+            svg += renderMetric(rightMetric, rightColX, yPos, showIcons, iconColor, textColor);
+        }
+        
         yPos += lineHeight;
     }
 
     svg += `</svg>`;
+    return svg;
+}
+
+function renderMetric(metric, x, y, showIcons, iconColor, textColor) {
+    let svg = '';
+    const formattedValue = metric.format(metric.value);
+    const iconOffset = showIcons && metric.icon ? 20 : 0;
+    const textX = x + iconOffset;
+
+    if (showIcons && metric.icon && octiconPaths[metric.icon]) {
+        const iconPath = octiconPaths[metric.icon];
+        const iconY = y - 11;
+        svg += `<g transform="translate(${x}, ${iconY})" fill="#${iconColor}">`;
+        svg += `<path d="${iconPath}" fill-rule="evenodd"/>`;
+        svg += `</g>`;
+    }
+
+    svg += `<text x="${textX}" y="${y}" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="13" fill="#${textColor}">${escapeXml(metric.label)}:</text>`;
+    svg += `<text x="${x + 180}" y="${y}" font-family="'Segoe UI', Ubuntu, Sans-Serif" font-size="13" font-weight="bold" fill="#${textColor}">${escapeXml(formattedValue)}</text>`;
     return svg;
 }
 
