@@ -1,5 +1,5 @@
 import fetch from 'node-fetch';
-import { GITHUB_API_BASE, GITHUB_TOKEN, PER_PAGE } from '../config.js';
+import { GITHUB_API_BASE, GITHUB_TOKEN } from '../config.js';
 
 // ==================== Konfigurasi GraphQL ====================
 const GRAPHQL_ENDPOINT = 'https://api.github.com/graphql';
@@ -12,10 +12,6 @@ const CACHE_TTL = 6 * 60 * 60 * 1000;
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Eksekusi kueri GraphQL dengan retry.
- * (Tidak di-cache di sini, caching dilakukan di level fetchAllOrgRepos)
- */
 async function graphqlRequest(query, variables = {}) {
     const headers = {
         'Authorization': `Bearer ${GITHUB_TOKEN}`,
@@ -61,11 +57,10 @@ async function graphqlRequest(query, variables = {}) {
     throw lastError;
 }
 
-// ==================== Fungsi Publik (Antarmuka Lama) ====================
+// ==================== Fungsi Publik ====================
 
 /**
- * Cek apakah akun adalah organisasi.
- * (Tetap menggunakan REST karena ringan dan GraphQL tidak memberi keuntungan)
+ * Cek apakah akun adalah organisasi (tetap REST).
  */
 export async function isOrganization(owner) {
     const url = `${GITHUB_API_BASE}/users/${owner}`;
@@ -89,14 +84,9 @@ export async function isOrganization(owner) {
 
 /**
  * Mengambil SEMUA repositori publik dari organisasi menggunakan GraphQL.
- * Antarmuka dan nilai kembalian sama seperti versi REST, tetapi di belakang layar pakai GraphQL.
- * Hasilnya di-cache selama 6 jam.
- * 
- * @param {string} org - Nama organisasi
- * @returns {Promise<Array>} - Array objek repo dengan struktur yang kompatibel
+ * Mengembalikan array dengan struktur yang kompatibel dengan REST API.
  */
 export async function fetchAllOrgRepos(org) {
-    // Cek cache
     const now = Date.now();
     const cached = cache.get(org);
     if (cached && cached.expires > now) {
@@ -121,23 +111,27 @@ export async function fetchAllOrgRepos(org) {
                         }
                         nodes {
                             name
-                            full_name: nameWithOwner
-                            stargazers_count: stargazerCount
-                            forks_count: forkCount
-                            watchers_count: watchers {
+                            nameWithOwner
+                            stargazerCount
+                            forkCount
+                            watchers {
                                 totalCount
                             }
-                            size: diskUsage
-                            open_issues_count: issues(states: OPEN) {
+                            diskUsage
+                            issues(states: OPEN) {
                                 totalCount
                             }
-                            language: primaryLanguage {
+                            pullRequests(states: OPEN) {
+                                totalCount
+                            }
+                            primaryLanguage {
                                 name
                             }
-                            license {
+                            licenseInfo {
                                 key
+                                spdxId
                             }
-                            topics: repositoryTopics(first: 10) {
+                            repositoryTopics(first: 20) {
                                 nodes {
                                     topic {
                                         name
@@ -155,19 +149,22 @@ export async function fetchAllOrgRepos(org) {
 
         if (!repoData) break;
 
-        // Transformasi data GraphQL ke struktur yang kompatibel dengan kode lama (REST-like)
+        // Transformasi ke format kompatibel REST
         for (const node of repoData.nodes) {
             const transformed = {
                 name: node.name,
-                full_name: node.full_name,
-                stargazers_count: node.stargazers_count,
-                forks_count: node.forks_count,
-                watchers_count: node.watchers_count,
-                size: node.size || 0,
-                open_issues_count: node.open_issues_count,
-                language: node.language?.name || null,
-                license: node.license ? { key: node.license.key } : null,
-                topics: node.topics?.nodes?.map(t => t.topic.name) || []
+                full_name: node.nameWithOwner,
+                stargazers_count: node.stargazerCount,
+                forks_count: node.forkCount,
+                watchers_count: node.watchers.totalCount,
+                size: node.diskUsage || 0,
+                open_issues_count: node.issues.totalCount,
+                language: node.primaryLanguage?.name || null,
+                license: node.licenseInfo ? {
+                    key: node.licenseInfo.key,
+                    spdx_id: node.licenseInfo.spdxId
+                } : null,
+                topics: node.repositoryTopics?.nodes?.map(t => t.topic.name) || []
             };
             repos.push(transformed);
         }
