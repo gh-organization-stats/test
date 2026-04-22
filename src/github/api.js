@@ -159,6 +159,7 @@ export async function fetchAllOrgRepos(org) {
                 watchers_count: node.watchers.totalCount,
                 size: node.diskUsage || 0,
                 open_issues_count: node.issues.totalCount,
+                open_prs_count: node.openPRs?.totalCount || 0,
                 language: node.primaryLanguage?.name || null,
                 license: node.licenseInfo ? {
                     key: node.licenseInfo.key,
@@ -183,4 +184,62 @@ export async function fetchAllOrgRepos(org) {
     });
 
     return repos;
+}
+
+/**
+ * Mengambil total commit untuk setiap repositori dalam array.
+ * @param {Array} repos - Array repositori (setidaknya punya properti nameWithOwner)
+ * @returns {Promise<Map<string, number>>} - Map dari full_name ke total commit
+ */
+export async function fetchAllReposCommitCounts(repos) {
+    const commitCounts = new Map();
+    
+    // Batasi paralelisme agar tidak membebani API
+    const batchSize = 5;
+    for (let i = 0; i < repos.length; i += batchSize) {
+        const batch = repos.slice(i, i + batchSize);
+        const promises = batch.map(repo => fetchRepoCommitCount(repo.nameWithOwner));
+        const results = await Promise.allSettled(promises);
+        
+        results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                commitCounts.set(batch[index].nameWithOwner, result.value);
+            } else {
+                console.warn(`Failed to fetch commits for ${batch[index].nameWithOwner}: ${result.reason}`);
+                commitCounts.set(batch[index].nameWithOwner, 0);
+            }
+        });
+        
+        // Jeda kecil antar batch untuk menghormati rate limit sekunder
+        if (i + batchSize < repos.length) {
+            await sleep(200);
+        }
+    }
+    
+    return commitCounts;
+}
+
+/**
+ * Mengambil total commit untuk satu repositori.
+ */
+async function fetchRepoCommitCount(repoFullName) {
+    const [owner, name] = repoFullName.split('/');
+    const query = `
+        query ($owner: String!, $name: String!) {
+            repository(owner: $owner, name: $name) {
+                defaultBranchRef {
+                    target {
+                        ... on Commit {
+                            history {
+                                totalCount
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    `;
+    
+    const data = await graphqlRequest(query, { owner, name });
+    return data.repository?.defaultBranchRef?.target?.history?.totalCount || 0;
 }

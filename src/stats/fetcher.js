@@ -1,12 +1,43 @@
-// src/stats/fetcher.js
 import fetch from 'node-fetch';
-import { GITHUB_API_BASE, githubHeaders } from '../config.js';
+import { GITHUB_API_BASE, GITHUB_TOKEN } from '../config.js';
+import { fetchAllOrgRepos, fetchAllReposCommitCounts } from '../github/api.js';
 
 /**
- * Mengambil semua data statistik untuk sebuah organisasi.
+ * Menghitung rank berdasarkan total stars.
+ * Level: S (>20k), A+ (10k-20k), A (5k-10k), B+ (2k-5k), B (1k-2k), C+ (500-1k), C (<500)
+ */
+function calculateRank(totalStars) {
+    let level, percentile;
+    if (totalStars >= 20000) {
+        level = 'S';
+        percentile = 99;
+    } else if (totalStars >= 10000) {
+        level = 'A+';
+        percentile = 95;
+    } else if (totalStars >= 5000) {
+        level = 'A';
+        percentile = 90;
+    } else if (totalStars >= 2000) {
+        level = 'B+';
+        percentile = 75;
+    } else if (totalStars >= 1000) {
+        level = 'B';
+        percentile = 60;
+    } else if (totalStars >= 500) {
+        level = 'C+';
+        percentile = 40;
+    } else {
+        level = 'C';
+        percentile = 20;
+    }
+    return { level, percentile };
+}
+
+/**
+ * Mengambil semua statistik untuk organisasi.
  * @param {string} org - Nama organisasi
- * @param {Array} repos - Array repositori yang sudah diambil
- * @returns {Promise<Object>} - Objek statistik
+ * @param {Array} repos - Array repositori dari fetchAllOrgRepos (sudah berisi data lengkap)
+ * @returns {Promise<Object>} - Objek statistik lengkap
  */
 export async function fetchOrgStats(org, repos) {
     const stats = {
@@ -25,78 +56,38 @@ export async function fetchOrgStats(org, repos) {
         topLanguage: 'N/A',
         languagesCount: 0,
         createdAt: null,
-        updatedAt: null
+        updatedAt: null,
+        totalCommits: 0,
+        rank: { level: 'C', percentile: 20 }
     };
 
-    // Hitung metrik dari repositori
     const langCount = {};
     
+    // --- 1. Hitung metrik dasar dari seluruh repositori ---
     for (const repo of repos) {
-        stats.totalStars += repo.stargazers_count;
-        stats.totalForks += repo.forks_count;
-        stats.totalWatchers += repo.watchers_count;
-        stats.totalSize += repo.size;
-        stats.openIssues += repo.open_issues_count;
+        stats.totalStars += repo.stargazers_count || 0;
+        stats.totalForks += repo.forks_count || 0;
+        stats.totalWatchers += repo.watchers_count || 0;
+        stats.totalSize += repo.size || 0;
+        stats.openIssues += repo.open_issues_count || 0;
+        stats.openPRs += repo.open_prs_count || 0; // diambil dari hasil transformasi GraphQL
         
         if (repo.language) {
             langCount[repo.language] = (langCount[repo.language] || 0) + 1;
         }
     }
 
-    // Tentukan top language dan jumlah bahasa unik
+    // --- 2. Top language & languages count ---
     const sortedLangs = Object.entries(langCount).sort((a, b) => b[1] - a[1]);
     if (sortedLangs.length > 0) {
         stats.topLanguage = sortedLangs[0][0];
         stats.languagesCount = sortedLangs.length;
     }
 
-    // Hitung open PRs (sampling untuk performa, atau hitung semua jika repos sedikit)
-    if (repos.length <= 30) {
-        // Hitung semua
-        for (const repo of repos) {
-            try {
-                const pullsUrl = `${GITHUB_API_BASE}/repos/${repo.full_name}/pulls?state=open&per_page=1`;
-                const res = await fetch(pullsUrl, { headers: githubHeaders });
-                if (res.ok) {
-                    const link = res.headers.get('link');
-                    if (link) {
-                        const match = link.match(/&page=(\d+)>; rel="last"/);
-                        stats.openPRs += match ? parseInt(match[1]) : 0;
-                    } else {
-                        const data = await res.json();
-                        stats.openPRs += data.length;
-                    }
-                }
-            } catch (e) {
-                console.warn(`Failed to fetch PRs for ${repo.full_name}`);
-            }
-        }
-    } else {
-        // Sampling 10 repo
-        const sample = repos.slice(0, 10);
-        let samplePRs = 0;
-        for (const repo of sample) {
-            try {
-                const pullsUrl = `${GITHUB_API_BASE}/repos/${repo.full_name}/pulls?state=open&per_page=1`;
-                const res = await fetch(pullsUrl, { headers: githubHeaders });
-                if (res.ok) {
-                    const link = res.headers.get('link');
-                    if (link) {
-                        const match = link.match(/&page=(\d+)>; rel="last"/);
-                        samplePRs += match ? parseInt(match[1]) : 0;
-                    } else {
-                        const data = await res.json();
-                        samplePRs += data.length;
-                    }
-                }
-            } catch (e) {}
-        }
-        stats.openPRs = Math.round((samplePRs / 10) * repos.length);
-    }
-
-    // Ambil data organisasi dari REST API
+    // --- 3. Ambil data organisasi (REST) ---
+    const headers = GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {};
     try {
-        const orgRes = await fetch(`${GITHUB_API_BASE}/orgs/${org}`, { headers: githubHeaders });
+        const orgRes = await fetch(`${GITHUB_API_BASE}/orgs/${org}`, { headers });
         if (orgRes.ok) {
             const orgData = await orgRes.json();
             stats.displayName = orgData.name || org;
@@ -105,21 +96,29 @@ export async function fetchOrgStats(org, repos) {
             stats.createdAt = orgData.created_at;
             stats.updatedAt = orgData.updated_at;
         }
-    } catch (e) {
-        console.error('Failed to fetch org data:', e);
-    }
 
-    // Ambil jumlah anggota publik (GraphQL akan lebih baik, tapi REST juga bisa)
-    try {
-        const membersRes = await fetch(`${GITHUB_API_BASE}/orgs/${org}/public_members`, { headers: githubHeaders });
+        const membersRes = await fetch(`${GITHUB_API_BASE}/orgs/${org}/public_members`, { headers });
         if (membersRes.ok) {
             const membersData = await membersRes.json();
             stats.members = membersData.length;
-            // Perhatikan: ini hanya anggota publik. Untuk total anggota, perlu GraphQL API.
         }
     } catch (e) {
-        console.error('Failed to fetch members:', e);
+        console.error('[FETCHER] Failed to fetch organization metadata:', e.message);
     }
+
+    // --- 4. Total commits seluruh repositori (akurat, tanpa sampling) ---
+    try {
+        console.log(`[FETCHER] Fetching commit counts for ${repos.length} repos...`);
+        const commitCounts = await fetchAllReposCommitCounts(repos);
+        stats.totalCommits = Array.from(commitCounts.values()).reduce((sum, c) => sum + c, 0);
+        console.log(`[FETCHER] Total commits: ${stats.totalCommits}`);
+    } catch (e) {
+        console.error('[FETCHER] Failed to fetch commit counts:', e.message);
+        stats.totalCommits = 0;
+    }
+
+    // --- 5. Hitung rank berdasarkan total stars ---
+    stats.rank = calculateRank(stats.totalStars);
 
     return stats;
 }
