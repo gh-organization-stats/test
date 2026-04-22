@@ -72,7 +72,6 @@ export default async function handleBadgeRequest(req, res) {
 async function handleCustomMetric(metric, owner, req, res) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const excludeParam = url.searchParams.get('exclude');
-    const styleParam = url.searchParams.get('style');
 
     const allRepos = await fetchAllOrgRepos(owner);
     let filteredRepos = allRepos;
@@ -100,7 +99,7 @@ async function handleCustomMetric(metric, owner, req, res) {
     }
 
     const badgePath = `/badge/${encodeURIComponent(config.label)}-${encodeURIComponent(message)}-${config.color}`;
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(url.search);
     params.delete('exclude');
     const queryString = params.toString();
     const badgeUrl = `${BADGE_SERVICE_BASE}${badgePath}${queryString ? '?' + queryString : ''}`;
