@@ -1,4 +1,3 @@
-// src/stats/renderer.js
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
@@ -48,7 +47,6 @@ const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
-// Fungsi fetch avatar (sebagai fallback jika tidak ada di cache)
 async function fetchImageAsBase64(url) {
   try {
     const response = await fetch(url);
@@ -192,7 +190,10 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
   svg.push(`.rank-circle-rim { stroke: #${ringColor}; fill: none; stroke-width: ${RANK_STROKE}; opacity: 0.2; }`);
   svg.push(`.rank-circle { stroke: #${ringColor}; stroke-dasharray: 250; fill: none; stroke-width: ${RANK_STROKE}; stroke-linecap: round; opacity: 0.8; transform-origin: -10px 8px; transform: rotate(-90deg); animation: rankAnimation 1s forwards ease-in-out; }`);
-  svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: 251.32741228718345; } to { stroke-dashoffset: ${251.32741228718345 * (1 - (stats.rank?.percentile || 0) / 100)}; } }`);
+  
+  const circumference = 2 * Math.PI * RANK_RADIUS; // ~251.327
+  const targetOffset = (stats.rank?.percentile || 0) / 100 * circumference;
+  svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: ${circumference}; } to { stroke-dashoffset: ${targetOffset}; } }`);
   svg.push(`@keyframes scaleInAnimation { from { transform: translate(-5px, 5px) scale(0); } to { transform: translate(-5px, 5px) scale(1); } }`);
   svg.push(`@keyframes fadeInAnimation { from { opacity: 0; } to { opacity: 1; } }`);
   svg.push(`</style>`);
@@ -226,7 +227,6 @@ export async function renderStatsCard(stats, options = {}) {
     svg.push(`<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
 
     if (rankIcon === 'avatar') {
-      // Gunakan avatarBase64 dari cache jika tersedia, jika tidak fetch ulang
       let avatarData = stats.avatarBase64;
       if (!avatarData && stats.avatarUrl) {
         avatarData = await fetchImageAsBase64(stats.avatarUrl);
@@ -252,8 +252,8 @@ export async function renderStatsCard(stats, options = {}) {
         svg.push(`</g>`);
       }
     } else if (rankIcon === 'percent') {
-      svg.push(`<text x="-5" y="-7" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 12px;">TOP</text>`);
-      svg.push(`<text x="-5" y="12" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 16px;">${stats.rank.percentile}%</text>`);
+      svg.push(`<text x="-5" y="-7" text-anchor="middle" class="rank-text" style="font-size: 12px;">TOP</text>`);
+      svg.push(`<text x="-5" y="12" text-anchor="middle" class="rank-text" style="font-size: 16px;">${stats.rank.percentile}%</text>`);
     } else {
       svg.push(`<g class="rank-text">`);
       svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);

@@ -1,4 +1,3 @@
-// src/stats/fetcher.js
 import fetch from 'node-fetch';
 import { GITHUB_API_BASE, GITHUB_TOKEN } from '../config.js';
 import { fetchAllOrgRepos, fetchAllReposCommitCounts } from '../github/api.js';
@@ -31,6 +30,7 @@ function log_normal_cdf(x) {
 
 /**
  * Menghitung rank organisasi menggunakan weighted percentiles.
+ * Semakin kecil percentile, semakin langka (rank tinggi).
  * @param {object} stats - Data statistik organisasi.
  * @returns {{ level: string, percentile: number }} - Hasil perhitungan rank.
  */
@@ -57,11 +57,7 @@ function calculateRank(stats) {
         PUBLIC_REPOS_WEIGHT +
         MEMBERS_WEIGHT;
 
-    // Threshold dari besar ke kecil
-    const THRESHOLDS = [100, 87.5, 75, 62.5, 50, 37.5, 25, 12.5, 0];
-    const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
-
-    // Hitung rata-rata terbobot CDF (tanpa 1 minus)
+    // Hitung rata-rata terbobot CDF (0-1, semakin tinggi metrik semakin mendekati 1)
     const rank =
         (TOTAL_STARS_WEIGHT * log_normal_cdf(stats.totalStars / TOTAL_STARS_MEDIAN) +
             TOTAL_FORKS_WEIGHT * log_normal_cdf(stats.totalForks / TOTAL_FORKS_MEDIAN) +
@@ -71,12 +67,16 @@ function calculateRank(stats) {
             MEMBERS_WEIGHT * log_normal_cdf(stats.members / MEMBERS_MEDIAN)) /
         TOTAL_WEIGHT;
 
-    const percentile = formatPercentile(rank * 100);
+    // Balik: persentase kecil berarti langka (1% TOP)
+    const percentile = formatPercentile((1 - rank) * 100);
 
-    // Cari level: iterasi threshold, jika percentile >= threshold, ambil level tersebut
-    let level = LEVELS[LEVELS.length - 1]; // default terendah
+    // Threshold untuk persentase kecil (semakin kecil semakin tinggi level)
+    const THRESHOLDS = [1, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
+    const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
+
+    let level = LEVELS[LEVELS.length - 1];
     for (let i = 0; i < THRESHOLDS.length; i++) {
-        if (percentile >= THRESHOLDS[i]) {
+        if (percentile <= THRESHOLDS[i]) {
             level = LEVELS[i];
             break;
         }
@@ -201,6 +201,7 @@ export async function fetchOrgStats(org, repos) {
         stats.avatarBase64 = await fetchAvatarAsBase64(stats.avatarUrl);
     }
 
+    // Simpan cache hanya untuk full fetch (tanpa exclude)
     if (!repos._excluded && !statsCache.has(org)) {
         statsCache.set(org, {
             data: stats,
