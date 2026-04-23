@@ -73,6 +73,20 @@ export async function renderStatsCard(stats, options = {}) {
   const cardWidthOpt = options.card_width ? parseInt(options.card_width) : null;
   const rankIcon = options.rank_icon || 'default';
 
+  // Alias font untuk kemudahan penggunaan
+  const fontAliases = {
+    'default': "'Segoe UI', Ubuntu, Sans-Serif",
+    'sans': "'Segoe UI', Ubuntu, Sans-Serif",
+    'serif': "'Times New Roman', Times, serif",
+    'times': "'Times New Roman', Times, serif",
+    'mono': "'Courier New', Courier, monospace",
+    'monospace': "'Courier New', Courier, monospace",
+    'system': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    'roboto': "'Roboto', 'Segoe UI', Ubuntu, Sans-Serif",
+    'poppins': "'Poppins', 'Segoe UI', Ubuntu, Sans-Serif",
+  };
+  const fontFamily = fontAliases[options.font] || options.font || fontAliases.default;
+
   // Warna
   const titleColor = cleanColor(options.title_color || theme.titleColor);
   const textColor = cleanColor(options.text_color || theme.textColor);
@@ -119,13 +133,10 @@ export async function renderStatsCard(stats, options = {}) {
   const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
   
-  // Lebar konten minimal (termasuk gap label-value)
   const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP);
   
-  // Ruang yang dibutuhkan rank circle
   let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
   
-  // Lebar awal kartu
   let width = Math.max(
     cardWidthOpt || 0,
     contentW + 2 * PADDING + rankSpace + EXTRA_WIDTH,
@@ -138,20 +149,16 @@ export async function renderStatsCard(stats, options = {}) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
     rankCircleY = (statsAreaHeight / 2) - 15;
 
-    // Hitung posisi X yang diinginkan
     const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
-    const minX = leftContentRight + 70; // jarak minimal dari ujung kanan konten
+    const minX = leftContentRight + 70;
     const defaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
     let desiredX = Math.max(defaultX, minX);
 
-    // Jika desiredX melebihi batas kanan kartu, perlebar kartu
     const requiredWidth = desiredX + RANK_RADIUS + PADDING + RIGHT_MARGIN;
     if (requiredWidth > width) {
       width = requiredWidth + EXTRA_WIDTH;
-      // Hitung ulang defaultX dengan width baru
       const newDefaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
       desiredX = Math.max(newDefaultX, minX);
-      // Update rankSpace untuk perhitungan judul
       rankSpace = width - (contentW + 2 * PADDING);
     }
     rankCircleX = desiredX;
@@ -167,14 +174,14 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`<title id="titleId">${escapeXml(customTitle)}'s GitHub Stats, Rank: ${stats.rank?.level || 'N/A'}</title>`);
   svg.push(`<desc id="descId">${statItems.map(i => `${i.label} ${i.value}`).join(', ')}</desc>`);
 
-  // Style
+  // Style dengan font dinamis
   svg.push(`<style>`);
-  svg.push(`.header { font: 600 18px 'Segoe UI', Ubuntu, Sans-Serif; fill: #${titleColor}; animation: fadeInAnimation 0.8s ease-in-out forwards; }`);
+  svg.push(`.header { font: 600 18px ${fontFamily}; fill: #${titleColor}; animation: fadeInAnimation 0.8s ease-in-out forwards; }`);
   svg.push(`@supports(-moz-appearance: auto) { .header { font-size: 15.5px; } }`);
-  svg.push(`.stat { font: 600 14px 'Segoe UI', Ubuntu, "Helvetica Neue", Sans-Serif; fill: #${textColor}; }`);
+  svg.push(`.stat { font: 600 14px ${fontFamily}; fill: #${textColor}; }`);
   svg.push(`@supports(-moz-appearance: auto) { .stat { font-size:12px; } }`);
   svg.push(`.stagger { opacity: 0; animation: fadeInAnimation 0.3s ease-in-out forwards; }`);
-  svg.push(`.rank-text { font: 800 24px 'Segoe UI', Ubuntu, Sans-Serif; fill: #${textColor}; animation: scaleInAnimation 0.3s ease-in-out forwards; }`);
+  svg.push(`.rank-text { font: 800 24px ${fontFamily}; fill: #${textColor}; animation: scaleInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
   svg.push(`.rank-circle-rim { stroke: #${ringColor}; fill: none; stroke-width: ${RANK_STROKE}; opacity: 0.2; }`);
   svg.push(`.rank-circle { stroke: #${ringColor}; stroke-dasharray: 250; fill: none; stroke-width: ${RANK_STROKE}; stroke-linecap: round; opacity: 0.8; transform-origin: -10px 8px; transform: rotate(-90deg); animation: rankAnimation 1s forwards ease-in-out; }`);
