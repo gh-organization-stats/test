@@ -3,6 +3,16 @@ import { GITHUB_API_BASE, GITHUB_TOKEN } from '../config.js';
 import { fetchAllOrgRepos, fetchAllReposCommitCounts } from '../github/api.js';
 
 /**
+ * Membulatkan angka menjadi maksimal 1 desimal.
+ * Contoh: 85.234 -> 85.2, 99.999 -> 100, 60 -> 60
+ */
+function formatPercentile(value) {
+    const rounded = Math.round(value * 10) / 10;
+    // Hapus .0 jika tidak diperlukan
+    return rounded % 1 === 0 ? Math.round(rounded) : rounded;
+}
+
+/**
  * Calculates the exponential cdf.
  * @param {number} x The value.
  * @returns {number} The exponential cdf (0-1).
@@ -66,7 +76,7 @@ function calculateRank(stats) {
       MEMBERS_WEIGHT * log_normal_cdf(stats.members / MEMBERS_MEDIAN)) /
     TOTAL_WEIGHT;
 
-  const percentile = rank * 100;
+  const percentile = formatPercentile(rank * 100);
   const levelIndex = THRESHOLDS.findIndex((t) => percentile <= t);
   const level = LEVELS[levelIndex];
 
