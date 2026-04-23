@@ -246,8 +246,8 @@ export async function renderStatsCard(stats, options = {}) {
         svg.push(`</g>`);
       }
     } else if (rankIcon === 'percent') {
-      svg.push(`<text x="-5" y="-4" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" font-size="10">TOP</text>`);
-      svg.push(`<text x="-5" y="12" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" font-size="6">${stats.rank.percentile}%</text>`);
+      svg.push(`<text x="-5" y="-7" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 12px;">TOP</text>`);
+      svg.push(`<text x="-5" y="12" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 16px;">${stats.rank.percentile}%</text>`);
     } else {
       svg.push(`<g class="rank-text">`);
       svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
