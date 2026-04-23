@@ -153,19 +153,24 @@ export function renderStatsCard(stats, options = {}) {
   svg.push(`<g data-testid="main-card-body" transform="translate(0, ${CARD_BODY_Y})">`);
 
   // Rank circle
-  if (!hideRank && stats.rank) {
-    const statsAreaHeight = statItems.length * LINE_HEIGHT;
-    const rankCircleY = statsAreaHeight / 2; // karena sudah di dalam translate(0, CARD_BODY_Y)
-    const rightPadding = PADDING + 10;
-    const rankCircleX = width - rightPadding - RANK_RADIUS;
+  let rankCircleX = 0, rankCircleY = 0;
+if (!hideRank && stats.rank) {
+  const statsAreaHeight = statItems.length * LINE_HEIGHT;
+  // Posisi Y: tengah area stat (karena group main-card-body sudah di-translate)
+  rankCircleY = statsAreaHeight / 2;
 
-    svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
-    svg.push(`<circle class="rank-circle-rim" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
-    svg.push(`<circle class="rank-circle" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
-    svg.push(`<g class="rank-text">`);
-    svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
-    svg.push(`</g></g>`);
-  }
+  // Posisi X: default di kanan, tetapi pastikan tidak bertabrakan dengan nilai panjang
+  const defaultX = width - PADDING - 10 - RANK_RADIUS; // 10px dari tepi kanan, mirip contoh
+  const minX = PADDING + maxLabelW + maxValueW + iconSpace + 30; // jarak aman 30px setelah nilai
+  rankCircleX = Math.max(defaultX, minX);
+  
+  svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
+  svg.push(`<circle class="rank-circle-rim" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
+  svg.push(`<circle class="rank-circle" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
+  svg.push(`<g class="rank-text">`);
+  svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+  svg.push(`</g></g>`);
+}
 
   // Metrik
   svg.push(`<svg x="0" y="0">`);
