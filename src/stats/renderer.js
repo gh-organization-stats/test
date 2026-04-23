@@ -103,8 +103,16 @@ export function renderStatsCard(stats, options = {}) {
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
   // Lebar konten: judul atau (label + spasi + nilai)
   const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + 10);
-  const rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 20);
-  const width = Math.max(cardWidthOpt || 0, contentW + 2 * PADDING + rankSpace, 300);
+  let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 20);
+  let width = Math.max(cardWidthOpt || 0, contentW + 2 * PADDING + rankSpace, 300);
+
+  if (!hideRank && stats.rank) {
+    const minRankX = PADDING + maxLabelW + maxValueW + iconSpace + 40 + RANK_RADIUS + PADDING;
+    if (minRankX > width) {
+      width = minRankX;
+      rankSpace = minRankX - (contentW + 2 * PADDING); // update rankSpace
+    }
+  }
 
   const titleLines = wrapText(customTitle, width - 2 * PADDING - rankSpace, TITLE_FONT_SIZE);
   const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
@@ -155,16 +163,14 @@ export function renderStatsCard(stats, options = {}) {
   // Rank circle
   let rankCircleX = 0, rankCircleY = 0;
 if (!hideRank && stats.rank) {
-  const statsAreaHeight = statItems.length * LINE_HEIGHT;
-  // Posisi Y: tengah area stat (karena group main-card-body sudah di-translate)
-  rankCircleY = statsAreaHeight / 2;
+    const statsAreaHeight = statItems.length * LINE_HEIGHT;
+    const rankCircleY = statsAreaHeight / 2;
+    const rightOffset = 20;
+    const defaultX = width - PADDING - rightOffset - RANK_RADIUS;
+    const minX = PADDING + maxLabelW + maxValueW + iconSpace + 40;
+    const rankCircleX = Math.max(defaultX, minX);
 
-  // Posisi X: default di kanan, tetapi pastikan tidak bertabrakan dengan nilai panjang
-  const defaultX = width - PADDING - 10 - RANK_RADIUS; // 10px dari tepi kanan, mirip contoh
-  const minX = PADDING + maxLabelW + maxValueW + iconSpace + 30; // jarak aman 30px setelah nilai
-  rankCircleX = Math.max(defaultX, minX);
-  
-  svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
+    svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
   svg.push(`<circle class="rank-circle-rim" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
   svg.push(`<circle class="rank-circle" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
   svg.push(`<g class="rank-text">`);
