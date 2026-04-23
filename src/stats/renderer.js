@@ -143,7 +143,7 @@ export async function renderStatsCard(stats, options = {}) {
   );
 
   // Lebar minimal yang diperlukan untuk judul (tanpa EXTRA_WIDTH)
-  const titleMinWidth = titleW + PADDING;
+  const titleMinWidth = (titleW + PADDING) - 10;
 
   // Lebar kartu awal: pilih yang terbesar antara baseWidth, titleMinWidth, atau custom
   let width = Math.max(
@@ -245,15 +245,18 @@ export async function renderStatsCard(stats, options = {}) {
         svg.push(`</g>`);
       }
     } else if (rankIcon === 'github') {
-      const githubPath = octiconPaths['mark-github'];
+  const githubPath = octiconPaths['mark-github'];
       if (githubPath) {
-        svg.push(`<g transform="translate(${cx - 12}, ${cy - 12}) scale(0.05)" fill="#${textColor}">`);
-        svg.push(`<path d="${githubPath}"/>`);
-        svg.push(`</g>`);
+    // Gunakan tag <svg> dengan viewBox yang tepat untuk menskalakan ikon
+    svg.push(`<g transform="translate(${cx - 12}, ${cy - 12})">`);
+    svg.push(`<svg viewBox="0 0 16 16" width="24" height="24" fill="#${textColor}">`);
+    svg.push(`<path d="${githubPath}"/>`);
+    svg.push(`</svg>`);
+    svg.push(`</g>`);
       } else {
-        svg.push(`<g class="rank-text">`);
-        svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
-        svg.push(`</g>`);
+    svg.push(`<g class="rank-text">`);
+    svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+    svg.push(`</g>`);
       }
     } else if (rankIcon === 'percent') {
       svg.push(`<text x="-5" y="-7" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 12px;">TOP</text>`);
