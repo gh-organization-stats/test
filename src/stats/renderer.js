@@ -209,8 +209,6 @@ export async function renderStatsCard(stats, options = {}) {
     let progressAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="round"`;
     let strokeValue = `#${ringColor}`;
     let inlineStyle = '';
-
-    // Tentukan apakah akan menggunakan kelas rank-circle atau tidak
     let useRankCircleClass = true;
 
     if (ringDesign === 'gradient') {
@@ -220,18 +218,15 @@ export async function renderStatsCard(stats, options = {}) {
       svg.push(`<stop offset="100%" stop-color="#${textColor}" />`);
       svg.push(`</linearGradient></defs>`);
       strokeValue = `url(#${gradId})`;
-      useRankCircleClass = false; // Jangan pakai kelas .rank-circle agar stroke dari CSS tidak menimpa
-    } else {
-      if (ringDesign === 'dash') {
-        progressAttrs += ` stroke-width="4"`;
-        inlineStyle = `stroke-dasharray: 2 6; stroke-linecap: butt;`;
-      } else if (ringDesign === 'zigzag') {
-        inlineStyle = `stroke-dasharray: 4 8; stroke-linecap: round;`;
-      }
-      // Tambahkan animasi jika tidak disable
-      if (!disableAnimations) {
-        inlineStyle += ` animation: rankAnimation 1s forwards ease-in-out;`;
-      }
+      useRankCircleClass = false;
+    } else if (ringDesign === 'dash') {
+      progressAttrs += ` stroke-width="5"`; // lebih tebal agar terlihat tinggi
+      inlineStyle = `stroke-dasharray: 8 4; stroke-linecap: butt;`; // garis 8px, celah 4px
+    }
+
+    // Animasi
+    if (!disableAnimations) {
+      inlineStyle += ` animation: rankAnimation 1s forwards ease-in-out;`;
     }
 
     if (useRankCircleClass) {
@@ -241,7 +236,7 @@ export async function renderStatsCard(stats, options = {}) {
       }
       svg.push(`<circle ${progressAttrs} stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} />`);
     } else {
-      // Gradient: tulis inline tanpa kelas, dengan animasi terpisah
+      // Gradient: tulis inline tanpa kelas
       progressAttrs += ` stroke="${strokeValue}" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr}`;
       if (!disableAnimations) {
         svg.push(`<circle ${progressAttrs} style="animation: rankAnimation 1s forwards ease-in-out;" />`);
@@ -250,7 +245,7 @@ export async function renderStatsCard(stats, options = {}) {
       }
     }
 
-    // Konten rank
+    // Konten rank (avatar, github, percent, default)
     if (rankIcon === 'avatar') {
       let avatarData = stats.avatarBase64;
       if (!avatarData && stats.avatarUrl) {
