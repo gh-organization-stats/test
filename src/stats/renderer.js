@@ -77,16 +77,8 @@ export async function renderStatsCard(stats, options = {}) {
   // Alias font
   const fontAliases = {
     'default': "'Segoe UI', Ubuntu, Sans-Serif",
-    'sans': "'Segoe UI', Ubuntu, Sans-Serif",
-    'serif': "'Times New Roman', Times, serif",
-    'times': "'Times New Roman', Times, serif",
-    'mono': "'Courier New', Courier, monospace",
-    'monospace': "'Courier New', Courier, monospace",
-    'system': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    'roboto': "'Roboto', 'Segoe UI', Ubuntu, Sans-Serif",
-    'poppins': "'Poppins', 'Segoe UI', Ubuntu, Sans-Serif",
   };
-  const fontFamily = fontAliases[options.font] || options.font || fontAliases.default;
+  const fontFamily = fontAliases[options.font] || fontAliases.default;
 
   // Warna
   const titleColor = cleanColor(options.title_color || theme.titleColor);
