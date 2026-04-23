@@ -1,8 +1,8 @@
-// src/stats/renderer.js
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 
+// --- Konstanta Layout dari github-readme-stats ---
 const PADDING = 25;
 const LINE_HEIGHT = 25;
 const TITLE_FONT_SIZE = 18;
@@ -12,6 +12,7 @@ const RANK_STROKE = 5;
 const ICON_SIZE = 16;
 const ICON_SPACING = 6;
 
+// --- Helper Warna ---
 function cleanColor(c) {
     if (!c) return 'ffffff';
     let cleaned = String(c).trim().replace(/^#/, '');
@@ -20,18 +21,19 @@ function cleanColor(c) {
 }
 const colorAttr = (c) => `#${cleanColor(c)}`;
 
+// --- Definisi Metrik ---
 const METRIC_DEFS = {
-    totalStars: { label: 'Total Stars', icon: 'star' },
-    totalForks: { label: 'Total Forks', icon: 'repo-forked' },
-    totalCommits: { label: 'Total Commits', icon: 'git-commit' },
-    openPRs: { label: 'Open PRs', icon: 'git-pull-request' },
-    openIssues: { label: 'Open Issues', icon: 'issue-opened' },
-    publicRepos: { label: 'Public Repos', icon: 'repo' },
-    totalSize: { label: 'Total Size', icon: 'database' },
-    members: { label: 'Members', icon: 'person' },
-    followers: { label: 'Followers', icon: 'people' },
-    topLanguage: { label: 'Top Language', icon: 'code' },
-    languagesCount: { label: 'Languages', icon: 'code-square' },
+    totalStars:    { label: 'Total Stars', icon: 'star' },
+    totalForks:    { label: 'Total Forks', icon: 'repo-forked' },
+    totalCommits:  { label: 'Total Commits', icon: 'git-commit' },
+    openPRs:       { label: 'Open PRs', icon: 'git-pull-request' },
+    openIssues:    { label: 'Open Issues', icon: 'issue-opened' },
+    publicRepos:   { label: 'Public Repos', icon: 'repo' },
+    totalSize:     { label: 'Total Size', icon: 'database' },
+    members:       { label: 'Members', icon: 'person' },
+    followers:     { label: 'Followers', icon: 'people' },
+    topLanguage:   { label: 'Top Language', icon: 'code' },
+    languagesCount:{ label: 'Languages', icon: 'code-square' },
     totalWatchers: { label: 'Total Watchers', icon: 'eye' },
 };
 
@@ -39,8 +41,8 @@ const CORE_METRICS = new Set([
     'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
-function flexLayout({ items, gap, direction }) {
-    if (direction !== 'column') return items;
+// --- Fungsi Layout Vertikal ---
+function flexLayout({ items, gap }) {
     return items.map((item, i) => `<g transform="translate(0, ${i * gap})">${item}</g>`);
 }
 
@@ -56,6 +58,7 @@ export function renderStatsCard(stats, options = {}) {
     const borderRadius = options.border_radius || '4.5';
     const cardWidthOpt = options.card_width ? parseInt(options.card_width) : null;
 
+    // Warna
     const titleColor = cleanColor(options.title_color || theme.titleColor);
     const textColor = cleanColor(options.text_color || theme.textColor);
     const iconColor = cleanColor(options.icon_color || theme.iconColor);
@@ -63,6 +66,7 @@ export function renderStatsCard(stats, options = {}) {
     const ringColor = cleanColor(options.ring_color || theme.ringColor);
     const rawBgColor = options.bg_color || theme.bgColor;
 
+    // Gradient
     let isGradient = false, gradientId = null, gradientAngle = 0, gradientStops = [];
     if (typeof rawBgColor === 'string' && rawBgColor.includes(',')) {
         isGradient = true;
@@ -73,6 +77,7 @@ export function renderStatsCard(stats, options = {}) {
     }
     const bgColor = cleanColor(rawBgColor);
 
+    // Kumpulkan metrik
     const statItems = [];
     for (const [key, def] of Object.entries(METRIC_DEFS)) {
         if (hide.has(key)) continue;
@@ -87,7 +92,7 @@ export function renderStatsCard(stats, options = {}) {
         }
     }
 
-    // Hitung lebar konten
+    // --- Hitung lebar teks ---
     let maxLabelW = 0, maxValueW = 0;
     statItems.forEach(item => {
         const lw = measureTextWidth(item.label + ':', METRIC_FONT_SIZE);
@@ -95,9 +100,11 @@ export function renderStatsCard(stats, options = {}) {
         if (lw > maxLabelW) maxLabelW = lw;
         if (vw > maxValueW) maxValueW = vw;
     });
+
     const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
     const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
-    const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + 20);
+    // Lebar konten minimal = judul atau label + nilai + spacing 10
+    const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + 10);
     const rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 20);
     const width = Math.max(cardWidthOpt || 0, contentW + 2 * PADDING + rankSpace, 300);
 
@@ -105,8 +112,11 @@ export function renderStatsCard(stats, options = {}) {
     const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
     const height = PADDING + titleHeight + 15 + statItems.length * LINE_HEIGHT + PADDING;
 
+    // --- Bangun SVG ---
     const svg = [];
     svg.push(`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`);
+    
+    // Defs gradient
     if (isGradient) {
         svg.push(`<defs><linearGradient id="${gradientId}" gradientTransform="rotate(${gradientAngle})">`);
         gradientStops.forEach((c, i) => {
@@ -115,21 +125,23 @@ export function renderStatsCard(stats, options = {}) {
         });
         svg.push(`</linearGradient></defs>`);
     }
+    
+    // Background
     const bgFill = isGradient ? `url(#${gradientId})` : colorAttr(bgColor);
     if (!hideBorder) {
         svg.push(`<rect width="${width}" height="${height}" rx="${borderRadius}" fill="${bgFill}" stroke="${colorAttr(borderColor)}" stroke-width="2"/>`);
     } else {
         svg.push(`<rect width="${width}" height="${height}" rx="${borderRadius}" fill="${bgFill}"/>`);
     }
-
+    
     // Judul
     let y = PADDING + TITLE_FONT_SIZE;
     titleLines.forEach(line => {
         svg.push(`<text x="${PADDING}" y="${y}" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="${TITLE_FONT_SIZE}" font-weight="bold" fill="${colorAttr(titleColor)}">${escapeXml(line)}</text>`);
         y += TITLE_FONT_SIZE + 4;
     });
-
-    // Rank
+    
+    // Rank circle
     if (!hideRank && stats.rank) {
         const rank = stats.rank;
         const cx = width - PADDING - RANK_RADIUS;
@@ -144,14 +156,15 @@ export function renderStatsCard(stats, options = {}) {
         svg.push(`<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="14" font-weight="bold" fill="${colorAttr(textColor)}">${rank.level || 'C+'}</text>`);
         svg.push(`<text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="9" fill="${colorAttr(textColor)}">${rank.percentile}%</text>`);
     }
-
-    // Metrik
+    
+    // Metrik (vertical layout dengan alignment kanan yang benar)
     const metricNodes = statItems.map(item => {
         const iconSvg = (showIcons && item.icon && octiconPaths[item.icon])
             ? `<g transform="translate(0, -3)" fill="${colorAttr(iconColor)}"><path d="${octiconPaths[item.icon]}" fill-rule="evenodd"/></g>`
             : '';
         const labelX = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
-        const valueX = labelX + maxLabelW + 20;
+        // Posisi nilai = padding + iconSpace + maxLabelWidth + 10 (spacing antar kolom)
+        const valueX = labelX + maxLabelW + 10;
         return `
             <g transform="translate(${PADDING}, 0)">
                 ${iconSvg}
@@ -160,7 +173,7 @@ export function renderStatsCard(stats, options = {}) {
             </g>
         `;
     });
-    const statsSvg = flexLayout({ items: metricNodes, gap: LINE_HEIGHT, direction: 'column' }).join('');
+    const statsSvg = flexLayout({ items: metricNodes, gap: LINE_HEIGHT }).join('');
     svg.push(`<g transform="translate(0, ${PADDING + titleHeight + 15})">${statsSvg}</g>`);
     svg.push(`</svg>`);
     return svg.join('');
