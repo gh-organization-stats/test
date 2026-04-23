@@ -3,37 +3,31 @@ import { fetchOrgStats } from '../src/stats/fetcher.js';
 import { renderStatsCard } from '../src/stats/renderer.js';
 
 export default async function handler(req, res) {
-    try {
-        const { org, exclude, theme, hide, show_icons, rank_icon } = req.query;
+  try {
+    const { org, exclude, theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon } = req.query;
 
-        if (!org) {
-            throw new Error('Parameter "org" is required');
-        }
+    if (!org) throw new Error('Parameter "org" is required');
 
-        // Ambil repositori (dengan cache internal)
-        const repos = await fetchAllOrgRepos(org);
-        
-        // Filter exclude
-        let filteredRepos = repos;
-        if (exclude) {
-            const excludeList = exclude.split(',').map(s => s.trim().toLowerCase());
-            filteredRepos = repos.filter(repo => {
-                const name = repo.name.toLowerCase();
-                const full = repo.full_name.toLowerCase();
-                return !excludeList.some(ex => name === ex || full.endsWith(`/${ex}`) || full === ex);
-            });
-        }
+    const repos = await fetchAllOrgRepos(org);
+    let filteredRepos = repos;
+    if (exclude) {
+      const excludeList = exclude.split(',').map(s => s.trim().toLowerCase());
+      filteredRepos = repos.filter(repo => {
+        const name = repo.name.toLowerCase();
+        const full = repo.nameWithOwner.toLowerCase();
+        return !excludeList.some(ex => name === ex || full.endsWith(`/${ex}`) || full === ex);
+      });
+    }
 
-        // Ambil statistik
-        const stats = await fetchOrgStats(org, filteredRepos);
+    const stats = await fetchOrgStats(org, filteredRepos);
 
-        // Render SVG
-        const svg = renderStatsCard(stats, { theme, hide, show_icons, rank_icon });
+    const svg = await renderStatsCard(stats, {
+      theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon
+    });
 
-        // Kirim respons
-        res.setHeader('Content-Type', 'image/svg+xml');
-        res.setHeader('Cache-Control', 'public, max-age=21600'); // 6 jam
-        res.send(svg);
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=21600');
+    res.send(svg);
 
     } catch (error) {
         console.error('[Stats Error]', error);

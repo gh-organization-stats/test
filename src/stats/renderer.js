@@ -1,6 +1,7 @@
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
+import fetch from 'node-fetch'; // untuk fetch avatar
 
 // Konstanta yang diambil langsung dari contoh SVG
 const PADDING = 25;
@@ -8,13 +9,13 @@ const TITLE_Y = 35;
 const CARD_BODY_Y = 55;
 const LINE_HEIGHT = 25;
 const TITLE_FONT_SIZE = 18;
-const METRIC_FONT_SIZE = 14; // contoh menggunakan 14px untuk stat
+const METRIC_FONT_SIZE = 14;
 const RANK_RADIUS = 40;
 const RANK_STROKE = 6;
 const ICON_SIZE = 16;
-const ICON_SPACING = 9; // dari icon ke teks = 25 - 16 = 9
-const RIGHT_MARGIN = 20; // jarak dari tepi kanan ke rank circle
-const EXTRA_WIDTH = 40; // tambahan lebar global
+const ICON_SPACING = 9;
+const RIGHT_MARGIN = 20;
+const EXTRA_WIDTH = 40;
 
 // Fungsi pembersih warna
 function cleanColor(c) {
@@ -45,7 +46,21 @@ const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
-export function renderStatsCard(stats, options = {}) {
+// Fungsi untuk fetch gambar dan konversi ke base64
+async function fetchImageAsBase64(url) {
+  try {
+    const response = await fetch(url);
+    const buffer = await response.buffer();
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const base64 = buffer.toString('base64');
+    return `data:${contentType};base64,${base64}`;
+  } catch (e) {
+    console.error('Failed to fetch avatar:', e);
+    return null;
+  }
+}
+
+export async function renderStatsCard(stats, options = {}) {
   const theme = themes[options.theme] || themes.default;
   const hide = new Set((options.hide || '').split(',').filter(Boolean));
   const show = new Set((options.show || '').split(',').filter(Boolean));
@@ -56,7 +71,7 @@ export function renderStatsCard(stats, options = {}) {
   const hideBorder = options.hide_border === 'true';
   const borderRadius = options.border_radius || '4.5';
   const cardWidthOpt = options.card_width ? parseInt(options.card_width) : null;
-  const rankIcon = options.rank_icon || 'default'; // 'default', 'percent', 'github', 'avatar'
+  const rankIcon = options.rank_icon || 'default';
 
   // Warna
   const titleColor = cleanColor(options.title_color || theme.titleColor);
@@ -103,14 +118,9 @@ export function renderStatsCard(stats, options = {}) {
 
   const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
-  
-  // Lebar konten minimal (tanpa rank)
   const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + 10);
   
-  // Hitung rankSpace dengan margin lebih besar
   let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
-  
-  // Lebar awal
   let width = Math.max(
     cardWidthOpt || 0,
     contentW + 2 * PADDING + rankSpace + EXTRA_WIDTH,
@@ -118,14 +128,12 @@ export function renderStatsCard(stats, options = {}) {
   );
 
   let rankCircleX = 0, rankCircleY = 0;
-  
   if (!hideRank && stats.rank) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
     rankCircleY = statsAreaHeight / 2;
 
     const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
-    const minX = leftContentRight + 70; // jarak ekstra dari nilai ke rank circle
-
+    const minX = leftContentRight + 70;
     const defaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
     let desiredX = Math.max(defaultX, minX);
 
@@ -149,7 +157,7 @@ export function renderStatsCard(stats, options = {}) {
   svg.push(`<title id="titleId">${escapeXml(customTitle)}'s GitHub Stats, Rank: ${stats.rank?.level || 'N/A'}</title>`);
   svg.push(`<desc id="descId">${statItems.map(i => `${i.label} ${i.value}`).join(', ')}</desc>`);
 
-  // Style (diambil dari contoh)
+  // Style
   svg.push(`<style>`);
   svg.push(`.header { font: 600 18px 'Segoe UI', Ubuntu, Sans-Serif; fill: #${titleColor}; animation: fadeInAnimation 0.8s ease-in-out forwards; }`);
   svg.push(`@supports(-moz-appearance: auto) { .header { font-size: 15.5px; } }`);
@@ -194,17 +202,33 @@ export function renderStatsCard(stats, options = {}) {
     svg.push(`<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
 
     if (rankIcon === 'avatar' && stats.avatarUrl) {
-      const clipId = `avatarClip-${Date.now()}`;
-      svg.push(`<defs><clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS - 2}" /></clipPath></defs>`);
-      svg.push(`<image x="${cx - RANK_RADIUS}" y="${cy - RANK_RADIUS}" width="${RANK_RADIUS * 2}" height="${RANK_RADIUS * 2}" clip-path="url(#${clipId})" href="${stats.avatarUrl}" preserveAspectRatio="xMidYMid slice" />`);
+      const base64Avatar = await fetchImageAsBase64(stats.avatarUrl);
+      if (base64Avatar) {
+        const clipId = `avatarClip-${Date.now()}`;
+        svg.push(`<defs><clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS - 2}" /></clipPath></defs>`);
+        svg.push(`<image x="${cx - RANK_RADIUS}" y="${cy - RANK_RADIUS}" width="${RANK_RADIUS * 2}" height="${RANK_RADIUS * 2}" clip-path="url(#${clipId})" href="${base64Avatar}" preserveAspectRatio="xMidYMid slice" />`);
+      } else {
+        // fallback ke huruf
+        svg.push(`<g class="rank-text">`);
+        svg.push(`<text x="${cx + 5}" y="${cy + 3}" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+        svg.push(`</g>`);
+      }
     } else if (rankIcon === 'github') {
-      svg.push(`<g transform="translate(${cx - 12}, ${cy - 12}) scale(0.05)" fill="#${textColor}">`);
-      svg.push(`<path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>`);
-      svg.push(`</g>`);
+      const githubPath = octiconPaths['mark-github'];
+      if (githubPath) {
+        svg.push(`<g transform="translate(${cx - 12}, ${cy - 12}) scale(0.05)" fill="#${textColor}">`);
+        svg.push(`<path d="${githubPath}"/>`);
+        svg.push(`</g>`);
+      } else {
+        // fallback
+        svg.push(`<g class="rank-text">`);
+        svg.push(`<text x="${cx + 5}" y="${cy + 3}" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+        svg.push(`</g>`);
+      }
     } else if (rankIcon === 'percent') {
       svg.push(`<text x="${cx + 5}" y="${cy + 3}" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" font-size="16">${stats.rank.percentile}%</text>`);
     } else {
-      // default: huruf rank
+      // default
       svg.push(`<g class="rank-text">`);
       svg.push(`<text x="${cx + 5}" y="${cy + 3}" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
       svg.push(`</g>`);
@@ -220,7 +244,6 @@ export function renderStatsCard(stats, options = {}) {
     svg.push(`<g transform="translate(0, ${yOffset})">`);
     svg.push(`<g class="stagger" style="animation-delay: ${delay}ms" transform="translate(${PADDING}, 0)">`);
     
-    // Ikon (jika ada)
     if (showIcons && item.icon && octiconPaths[item.icon]) {
       svg.push(`<svg data-testid="icon" class="icon" viewBox="0 0 16 16" version="1.1" width="16" height="16">`);
       svg.push(`<path fill-rule="evenodd" d="${octiconPaths[item.icon]}"/>`);
@@ -228,7 +251,7 @@ export function renderStatsCard(stats, options = {}) {
     }
     
     const labelX = showIcons ? ICON_SIZE + ICON_SPACING : 0;
-    const valueX = labelX + maxLabelW + 10; // posisi nilai dihitung dinamis
+    const valueX = labelX + maxLabelW + 10;
     
     svg.push(`<text class="stat bold" x="${labelX}" y="12.5">${escapeXml(item.label)}</text>`);
     svg.push(`<text class="stat bold" x="${valueX}" y="12.5" data-testid="${item.key}">${escapeXml(item.value)}</text>`);
