@@ -16,7 +16,7 @@ const ICON_SIZE = 16;
 const ICON_SPACING = 9;
 const RIGHT_MARGIN = 20;
 const EXTRA_WIDTH = 40;
-const LABEL_VALUE_GAP = 20;
+const LABEL_VALUE_GAP = 35;
 
 // Fungsi pembersih warna
 function cleanColor(c) {
