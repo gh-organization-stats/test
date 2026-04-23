@@ -34,29 +34,45 @@ export function formatSize(sizeKB) {
  * Memecah teks menjadi beberapa baris.
  */
 export function wrapText(text, maxWidth, fontSize) {
-    const avgCharWidth = fontSize * 0.6;
-    const maxChars = Math.floor(maxWidth / avgCharWidth);
-    
-    const words = String(text).split(' ');
-    const lines = [];
-    let currentLine = '';
+  const words = String(text).split(' ');
+  const lines = [];
+  let currentLine = '';
 
-    for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        if (testLine.length > maxChars) {
-            if (currentLine) {
-                lines.push(currentLine);
-                currentLine = word;
-            } else {
-                lines.push(word.slice(0, maxChars - 3) + '...');
-                currentLine = '';
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    if (measureTextWidth(testLine, fontSize) <= maxWidth) {
+      currentLine = testLine;
+    } else {
+      if (currentLine) {
+        lines.push(currentLine);
+        currentLine = '';
+      }
+      // Jika satu kata lebih panjang dari maxWidth, potong paksa
+      if (measureTextWidth(word, fontSize) > maxWidth) {
+        let remaining = word;
+        while (remaining.length > 0) {
+          let cutIndex = remaining.length;
+          for (let i = 1; i <= remaining.length; i++) {
+            if (measureTextWidth(remaining.slice(0, i) + '-', fontSize) > maxWidth) {
+              cutIndex = i - 1;
+              break;
             }
-        } else {
-            currentLine = testLine;
+          }
+          if (cutIndex <= 0) cutIndex = 1;
+          lines.push(remaining.slice(0, cutIndex) + '-');
+          remaining = remaining.slice(cutIndex);
         }
+      } else {
+        currentLine = word;
+      }
     }
-    if (currentLine) lines.push(currentLine);
-    return lines.length ? lines : [String(text)];
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines.length > 0 ? lines : [String(text)];
 }
 
 // ===== IDENTIK DENGAN REPO ASLI =====
