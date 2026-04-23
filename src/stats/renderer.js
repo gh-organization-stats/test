@@ -15,7 +15,7 @@ const ICON_SIZE = 16;
 const ICON_SPACING = 9;
 const RIGHT_MARGIN = 20;
 const EXTRA_WIDTH = 40;
-const LABEL_VALUE_GAP_MIN = 20; // jarak minimal antara label dan value
+const LABEL_VALUE_GAP_MIN = 0; // jarak minimal antara label dan value
 
 // Fungsi pembersih warna
 function cleanColor(c) {
