@@ -129,7 +129,7 @@ export async function renderStatsCard(stats, options = {}) {
   let rankCircleX = 0, rankCircleY = 0;
   if (!hideRank && stats.rank) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
-    rankCircleY = statsAreaHeight / 2;
+    rankCircleY = (statsAreaHeight / 2) - 10;
 
     const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
     const minX = leftContentRight + 70;
