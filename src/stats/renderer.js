@@ -143,7 +143,7 @@ export async function renderStatsCard(stats, options = {}) {
   );
 
   // Lebar minimal yang diperlukan untuk judul (tanpa EXTRA_WIDTH)
-  const titleMinWidth = titleW + 2 * PADDING;
+  const titleMinWidth = (titleW + 2 * PADDING) - 15;
 
   // Lebar kartu awal: pilih yang terbesar antara baseWidth, titleMinWidth, atau custom
   let width = Math.max(
