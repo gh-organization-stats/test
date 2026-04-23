@@ -248,8 +248,8 @@ export async function renderStatsCard(stats, options = {}) {
   const githubPath = octiconPaths['mark-github'];
       if (githubPath) {
     // Gunakan tag <svg> dengan viewBox yang tepat untuk menskalakan ikon
-    svg.push(`<g transform="translate(-45, -27)">`);
-    svg.push(`<svg viewBox="0 0 16 16" width="70" height="70" fill="#${textColor}">`);
+    svg.push(`<g transform="translate(${cx - 32}, ${cy - 32})">`);
+    svg.push(`<svg viewBox="0 0 16 16" width="64" height="64" fill="#${textColor}">`);
     svg.push(`<path d="${githubPath}"/>`);
     svg.push(`</svg>`);
     svg.push(`</g>`);
