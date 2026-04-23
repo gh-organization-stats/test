@@ -2,38 +2,22 @@ import fetch from 'node-fetch';
 import { GITHUB_API_BASE, GITHUB_TOKEN } from '../config.js';
 import { fetchAllOrgRepos, fetchAllReposCommitCounts } from '../github/api.js';
 
-// Cache untuk hasil fetchOrgStats (6 jam)
 const statsCache = new Map();
 const STATS_CACHE_TTL = 6 * 60 * 60 * 1000;
 
-/**
- * Membulatkan angka menjadi maksimal 1 desimal.
- */
 function formatPercentile(value) {
     const rounded = Math.round(value * 10) / 10;
     return rounded % 1 === 0 ? Math.round(rounded) : rounded;
 }
 
-/**
- * Calculates the exponential cdf.
- */
 function exponential_cdf(x) {
     return 1 - 2 ** -x;
 }
 
-/**
- * Calculates the log normal cdf approximation.
- */
 function log_normal_cdf(x) {
     return x / (1 + x);
 }
 
-/**
- * Menghitung rank organisasi menggunakan weighted percentiles.
- * Semakin kecil percentile, semakin langka (rank tinggi).
- * @param {object} stats - Data statistik organisasi.
- * @returns {{ level: string, percentile: number }} - Hasil perhitungan rank.
- */
 function calculateRank(stats) {
     const TOTAL_STARS_MEDIAN = 500;
     const TOTAL_FORKS_MEDIAN = 200;
@@ -57,7 +41,9 @@ function calculateRank(stats) {
         PUBLIC_REPOS_WEIGHT +
         MEMBERS_WEIGHT;
 
-    // Hitung rata-rata terbobot CDF (0-1, semakin tinggi metrik semakin mendekati 1)
+    const THRESHOLDS = [1, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
+    const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
+
     const rank =
         (TOTAL_STARS_WEIGHT * log_normal_cdf(stats.totalStars / TOTAL_STARS_MEDIAN) +
             TOTAL_FORKS_WEIGHT * log_normal_cdf(stats.totalForks / TOTAL_FORKS_MEDIAN) +
@@ -67,27 +53,13 @@ function calculateRank(stats) {
             MEMBERS_WEIGHT * log_normal_cdf(stats.members / MEMBERS_MEDIAN)) /
         TOTAL_WEIGHT;
 
-    // Balik: persentase kecil berarti langka (1% TOP)
-    const percentile = formatPercentile((1 - rank) * 100);
-
-    // Threshold untuk persentase kecil (semakin kecil semakin tinggi level)
-    const THRESHOLDS = [1, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
-    const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
-
-    let level = LEVELS[LEVELS.length - 1];
-    for (let i = 0; i < THRESHOLDS.length; i++) {
-        if (percentile <= THRESHOLDS[i]) {
-            level = LEVELS[i];
-            break;
-        }
-    }
+    const percentile = formatPercentile(rank * 100);
+    const levelIndex = THRESHOLDS.findIndex((t) => percentile <= t);
+    const level = LEVELS[levelIndex];
 
     return { level, percentile };
 }
 
-/**
- * Fetch gambar avatar dan konversi ke base64.
- */
 async function fetchAvatarAsBase64(url) {
     try {
         const response = await fetch(url);
@@ -101,12 +73,6 @@ async function fetchAvatarAsBase64(url) {
     }
 }
 
-/**
- * Mengambil semua statistik untuk organisasi.
- * @param {string} org - Nama organisasi
- * @param {Array} [repos] - Array repositori (opsional). Jika tidak diberikan, akan diambil dari cache/api.
- * @returns {Promise<Object>} - Objek statistik lengkap
- */
 export async function fetchOrgStats(org, repos) {
     const now = Date.now();
 
@@ -201,7 +167,6 @@ export async function fetchOrgStats(org, repos) {
         stats.avatarBase64 = await fetchAvatarAsBase64(stats.avatarUrl);
     }
 
-    // Simpan cache hanya untuk full fetch (tanpa exclude)
     if (!repos._excluded && !statsCache.has(org)) {
         statsCache.set(org, {
             data: stats,

@@ -3,7 +3,6 @@ import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 import fetch from 'node-fetch';
 
-// Konstanta
 const PADDING = 25;
 const TITLE_Y = 35;
 const CARD_BODY_Y = 55;
@@ -16,7 +15,7 @@ const ICON_SIZE = 16;
 const ICON_SPACING = 9;
 const RIGHT_MARGIN = 20;
 const EXTRA_WIDTH = 40;
-const LABEL_VALUE_GAP = 35;
+const LABEL_VALUE_GAP_MIN = 20; // jarak minimal antara label dan value
 
 // Fungsi pembersih warna
 function cleanColor(c) {
@@ -133,25 +132,29 @@ export async function renderStatsCard(stats, options = {}) {
 
   const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
-  
-  const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP);
-  
+
+  // Lebar konten tanpa memperhitungkan rank
+  const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP_MIN);
+
   let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
-  
   let width = Math.max(
     cardWidthOpt || 0,
     contentW + 2 * PADDING + rankSpace + EXTRA_WIDTH,
     350
   );
 
+  // Menyimpan posisi rank circle
   let rankCircleX = 0, rankCircleY = 0;
-  
+
   if (!hideRank && stats.rank) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
     rankCircleY = (statsAreaHeight / 2) - 15;
 
-    const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
-    const minX = leftContentRight + 70;
+    // Jarak minimal dari kiri (setelah konten) ke rank circle
+    const leftContentRight = PADDING + maxLabelW + maxValueW + iconSpace;
+    // Tambahkan jarak proporsional berdasarkan lebar kartu
+    const extraGap = Math.max(0, (width - (contentW + 2*PADDING + rankSpace)) / 2);
+    const minX = leftContentRight + 70 + extraGap;
     const defaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
     let desiredX = Math.max(defaultX, minX);
 
@@ -160,12 +163,14 @@ export async function renderStatsCard(stats, options = {}) {
       width = requiredWidth + EXTRA_WIDTH;
       const newDefaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
       desiredX = Math.max(newDefaultX, minX);
-      rankSpace = width - (contentW + 2 * PADDING);
+      rankSpace = width - (contentW + 2*PADDING);
     }
     rankCircleX = desiredX;
   }
 
-  const titleLines = wrapText(customTitle, width - 2 * PADDING - rankSpace, TITLE_FONT_SIZE);
+  // Judul menggunakan lebar yang tersedia setelah rank circle
+  const titleMaxWidth = width - 2*PADDING - (hideRank ? 0 : (RANK_RADIUS * 2 + 20));
+  const titleLines = wrapText(customTitle, titleMaxWidth, TITLE_FONT_SIZE);
   const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
   const height = CARD_BODY_Y + statItems.length * LINE_HEIGHT + PADDING;
 
@@ -190,10 +195,7 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
   svg.push(`.rank-circle-rim { stroke: #${ringColor}; fill: none; stroke-width: ${RANK_STROKE}; opacity: 0.2; }`);
   svg.push(`.rank-circle { stroke: #${ringColor}; stroke-dasharray: 250; fill: none; stroke-width: ${RANK_STROKE}; stroke-linecap: round; opacity: 0.8; transform-origin: -10px 8px; transform: rotate(-90deg); animation: rankAnimation 1s forwards ease-in-out; }`);
-  
-  const circumference = 2 * Math.PI * RANK_RADIUS; // ~251.327
-  const targetOffset = (stats.rank?.percentile || 0) / 100 * circumference;
-  svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: ${circumference}; } to { stroke-dashoffset: ${targetOffset}; } }`);
+  svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: 251.32741228718345; } to { stroke-dashoffset: ${251.32741228718345 * (1 - (stats.rank?.percentile || 0) / 100)}; } }`);
   svg.push(`@keyframes scaleInAnimation { from { transform: translate(-5px, 5px) scale(0); } to { transform: translate(-5px, 5px) scale(1); } }`);
   svg.push(`@keyframes fadeInAnimation { from { opacity: 0; } to { opacity: 1; } }`);
   svg.push(`</style>`);
@@ -277,7 +279,12 @@ export async function renderStatsCard(stats, options = {}) {
     }
     
     const labelX = showIcons ? ICON_SIZE + ICON_SPACING : 0;
-    const valueX = labelX + maxLabelW + LABEL_VALUE_GAP;
+    
+    // Posisi value: rata kanan di dalam area konten, tetapi minimal ada jarak LABEL_VALUE_GAP_MIN dari label
+    const valueWidth = measureTextWidth(item.value, METRIC_FONT_SIZE);
+    const maxValueX = width - PADDING; // ujung kanan
+    const minValueX = labelX + maxLabelW + LABEL_VALUE_GAP_MIN;
+    const valueX = Math.max(minValueX, maxValueX - valueWidth);
     
     svg.push(`<text class="stat-label" x="${labelX}" y="12.5">${escapeXml(item.label)}</text>`);
     svg.push(`<text class="stat-value" x="${valueX}" y="12.5" data-testid="${item.key}">${escapeXml(item.value)}</text>`);
