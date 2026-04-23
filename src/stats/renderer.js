@@ -118,9 +118,14 @@ export async function renderStatsCard(stats, options = {}) {
 
   const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
-  const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + 10);
   
+  // Lebar konten minimal (termasuk gap label-value)
+  const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP);
+  
+  // Ruang yang dibutuhkan rank circle
   let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
+  
+  // Lebar awal kartu
   let width = Math.max(
     cardWidthOpt || 0,
     contentW + 2 * PADDING + rankSpace + EXTRA_WIDTH,
@@ -128,21 +133,26 @@ export async function renderStatsCard(stats, options = {}) {
   );
 
   let rankCircleX = 0, rankCircleY = 0;
+  
   if (!hideRank && stats.rank) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
     rankCircleY = (statsAreaHeight / 2) - 15;
 
+    // Hitung posisi X yang diinginkan
     const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
-    const minX = leftContentRight + 70;
+    const minX = leftContentRight + 70; // jarak minimal dari ujung kanan konten
     const defaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
     let desiredX = Math.max(defaultX, minX);
 
+    // Jika desiredX melebihi batas kanan kartu, perlebar kartu
     const requiredWidth = desiredX + RANK_RADIUS + PADDING + RIGHT_MARGIN;
     if (requiredWidth > width) {
       width = requiredWidth + EXTRA_WIDTH;
-      rankSpace = requiredWidth + EXTRA_WIDTH - (contentW + 2 * PADDING);
+      // Hitung ulang defaultX dengan width baru
       const newDefaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
       desiredX = Math.max(newDefaultX, minX);
+      // Update rankSpace untuk perhitungan judul
+      rankSpace = width - (contentW + 2 * PADDING);
     }
     rankCircleX = desiredX;
   }
