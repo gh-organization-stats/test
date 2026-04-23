@@ -74,11 +74,7 @@ export async function renderStatsCard(stats, options = {}) {
   const rankIcon = options.rank_icon || 'default';
   const allBold = options.all_bold === 'true';
 
-  // Alias font
-  const fontAliases = {
-    'default': "'Segoe UI', Ubuntu, Sans-Serif",
-  };
-  const fontFamily = fontAliases[options.font] || fontAliases.default;
+  const fontFamily = "'Segoe UI', Ubuntu, Sans-Serif";
 
   // Warna
   const titleColor = cleanColor(options.title_color || theme.titleColor);
