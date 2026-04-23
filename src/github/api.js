@@ -186,36 +186,45 @@ export async function fetchAllOrgRepos(org) {
     return repos;
 }
 
+// src/github/api.js
+
+// ... kode sebelumnya ...
+
 /**
  * Mengambil total commit untuk setiap repositori dalam array.
- * @param {Array} repos - Array repositori (setidaknya punya properti nameWithOwner)
- * @returns {Promise<Map<string, number>>} - Map dari full_name ke total commit
  */
 export async function fetchAllReposCommitCounts(repos) {
     const commitCounts = new Map();
     
-    // Batasi paralelisme agar tidak membebani API
+    // Batasi paralelisme
     const batchSize = 5;
     for (let i = 0; i < repos.length; i += batchSize) {
         const batch = repos.slice(i, i + batchSize);
-        const promises = batch.map(repo => fetchRepoCommitCount(repo.nameWithOwner));
+        const promises = batch.map(repo => {
+            // Pastikan full_name ada, fallback ke nameWithOwner
+            const fullName = repo.full_name || repo.nameWithOwner;
+            if (!fullName) {
+                console.warn('Repository missing full_name, skipping commit fetch');
+                return Promise.resolve(0);
+            }
+            return fetchRepoCommitCount(fullName);
+        });
         const results = await Promise.allSettled(promises);
         
         results.forEach((result, index) => {
+            const fullName = batch[index].full_name || batch[index].nameWithOwner;
             if (result.status === 'fulfilled') {
-                commitCounts.set(batch[index].nameWithOwner, result.value);
+                commitCounts.set(fullName, result.value);
             } else {
-                console.warn(`Failed to fetch commits for ${batch[index].nameWithOwner}: ${result.reason}`);
-                commitCounts.set(batch[index].nameWithOwner, 0);
+                console.warn(`Failed to fetch commits for ${fullName}: ${result.reason}`);
+                commitCounts.set(fullName, 0);
             }
         });
         
-        // Jeda kecil antar batch untuk menghormati rate limit sekunder
         if (i + batchSize < repos.length) {
             await sleep(200);
         }
     }
-    
     return commitCounts;
 }
 
@@ -223,7 +232,15 @@ export async function fetchAllReposCommitCounts(repos) {
  * Mengambil total commit untuk satu repositori.
  */
 async function fetchRepoCommitCount(repoFullName) {
-    const [owner, name] = repoFullName.split('/');
+    if (!repoFullName || typeof repoFullName !== 'string') {
+        return 0;
+    }
+    const parts = repoFullName.split('/');
+    if (parts.length !== 2) {
+        console.warn(`Invalid repoFullName format: ${repoFullName}`);
+        return 0;
+    }
+    const [owner, name] = parts;
     const query = `
         query ($owner: String!, $name: String!) {
             repository(owner: $owner, name: $name) {
@@ -240,6 +257,11 @@ async function fetchRepoCommitCount(repoFullName) {
         }
     `;
     
-    const data = await graphqlRequest(query, { owner, name });
-    return data.repository?.defaultBranchRef?.target?.history?.totalCount || 0;
+    try {
+        const data = await graphqlRequest(query, { owner, name });
+        return data.repository?.defaultBranchRef?.target?.history?.totalCount || 0;
+    } catch (error) {
+        console.error(`GraphQL error for ${repoFullName}:`, error.message);
+        return 0;
+    }
 }
