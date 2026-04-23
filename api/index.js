@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         const stats = await fetchOrgStats(org, filteredRepos);
 
         // Render SVG
-        const svg = renderStatsCard(stats, { theme, hide, show_icons });
+        const svg = renderStatsCard(stats, { theme, hide, show_icons, rank_icon });
 
         // Kirim respons
         res.setHeader('Content-Type', 'image/svg+xml');
