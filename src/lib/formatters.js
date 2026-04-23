@@ -1,4 +1,3 @@
-
 /**
  * Memformat angka besar menjadi string pendek (K, M, B, T).
  */
@@ -61,31 +60,29 @@ export function wrapText(text, maxWidth, fontSize) {
 }
 
 /**
- * Estimasi lebar teks dengan mempertimbangkan karakter lebar dan sempit.
- * Menggunakan tabel lebar karakter sederhana untuk akurasi yang lebih baik.
+ * Fungsi untuk mengukur lebar teks. Meniru logika di github-readme-stats.
  */
-const CHAR_WIDTH_MAP = {
-    // Karakter lebar penuh (umumnya huruf besar, angka, simbol tertentu)
-    WIDE: 1.0,
-    // Karakter sempit (huruf kecil, spasi, titik, dll.)
-    NARROW: 0.6
-};
-
-function getCharWidth(char) {
-    // Karakter yang cenderung lebih lebar
-    if (/[A-Z0-9@#%&*()+=?<>{}[\]|]/.test(char)) {
-        return CHAR_WIDTH_MAP.WIDE;
-    }
-    // Karakter sempit termasuk huruf kecil, spasi, tanda baca
-    return CHAR_WIDTH_MAP.NARROW;
-}
-
 export function measureTextWidth(text, fontSize) {
     if (!text) return 0;
-    const avgWidthPerChar = fontSize * 0.55; // Rata-rata proporsional
-    let totalWidth = 0;
+    const charWidths = {
+        thin: 0.4,
+        normal: 0.55,
+        wide: 0.7
+    };
+    let width = 0;
     for (const char of String(text)) {
-        totalWidth += getCharWidth(char) * fontSize * 0.55;
+        // Karakter lebar: huruf besar, angka, simbol tertentu
+        if (/[A-Z0-9@#%&*()+=?<>{}[\]|]/.test(char)) {
+            width += charWidths.wide * fontSize;
+        }
+        // Karakter sempit: huruf kecil, spasi, titik, koma, dll.
+        else if (/[a-z\s.,;:'"!-]/.test(char)) {
+            width += charWidths.thin * fontSize;
+        }
+        // Default
+        else {
+            width += charWidths.normal * fontSize;
+        }
     }
-    return totalWidth;
+    return width;
 }
