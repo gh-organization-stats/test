@@ -159,7 +159,7 @@ export async function fetchAllOrgRepos(org) {
                 watchers_count: node.watchers.totalCount,
                 size: node.diskUsage || 0,
                 open_issues_count: node.issues.totalCount,
-                open_prs_count: node.openPRs?.totalCount || 0,
+                open_prs_count: node.pullRequests.totalCount || 0,
                 language: node.primaryLanguage?.name || null,
                 license: node.licenseInfo ? {
                     key: node.licenseInfo.key,
