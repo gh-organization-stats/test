@@ -221,7 +221,7 @@ export async function renderStatsCard(stats, options = {}) {
       useRankCircleClass = false;
     } else if (ringDesign === 'dash') {
       progressAttrs += ` stroke-width="5"`; // lebih tebal agar terlihat tinggi
-      inlineStyle = `stroke-dasharray: 8 4; stroke-linecap: butt;`; // garis 8px, celah 4px
+      inlineStyle = `stroke-dasharray: 16 4; stroke-linecap: round;`; // garis 8px, celah 4px
     }
 
     // Animasi
