@@ -1,11 +1,9 @@
-// src/stats/renderer.js
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 import fetch from 'node-fetch';
 import sharp from 'sharp';
 
-// Konstanta
 const PADDING = 25;
 const TITLE_Y = 35;
 const CARD_BODY_Y = 55;
@@ -53,12 +51,10 @@ async function processAvatarFromBase64(base64Data, size, quality) {
     if (!matches) throw new Error('Invalid base64 data format');
     const rawBase64 = matches[2];
     const buffer = Buffer.from(rawBase64, 'base64');
-
     const processedBuffer = await sharp(buffer)
       .resize(size, size, { fit: 'cover', withoutEnlargement: true })
       .jpeg({ quality })
       .toBuffer();
-
     const newBase64 = processedBuffer.toString('base64');
     return `data:image/jpeg;base64,${newBase64}`;
   } catch (e) {
@@ -200,58 +196,64 @@ export async function renderStatsCard(stats, options = {}) {
     const cy = 8;
     const circ = 2 * Math.PI * RANK_RADIUS;
     const target = ((100 - (stats.rank?.percentile || 0)) / 100) * circ;
-
-    svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
-    svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
-
-    // Progress circle berdasarkan ringDesign
-    const animStyle = disableAnimations ? '' : 'style="animation: rankAnimation 1s forwards ease-in-out"';
     const transformAttr = `transform="rotate(-90 ${cx} ${cy})"`;
     const commonAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-width="${RANK_STROKE}" stroke-linecap="round" class="rank-circle"`;
+    const animContent = disableAnimations ? '' : 'animation: rankAnimation 1s forwards ease-in-out;';
+
+    svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
+
+    // Lingkaran latar (kecuali untuk dash yang memang diminta tanpa rim)
+    if (ringDesign !== 'dash') {
+      svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
+    }
+
+    let progressStyle = animContent;
+    let progressStroke = `#${ringColor}`;
+    let progressExtra = '';
 
     switch (ringDesign) {
-      case 'dash': {
-        const dashLen = (circ / 24) - 2; // 24 segmen
-        svg.push(`<circle ${commonAttrs} style="stroke-dasharray: ${dashLen} 4;" stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
+      case 'dash':
+        // Garis lurus pendek mengitari lingkaran, tanpa rim
+        progressStyle = `stroke-dasharray: 4 8; stroke-linecap: butt; ${animContent}`;
         break;
-      }
-      case 'dotted': {
-        svg.push(`<circle ${commonAttrs} style="stroke-dasharray: 2 8;" stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
+      case 'dotted':
+        progressStyle = `stroke-dasharray: 2 8; stroke-linecap: round; ${animContent}`;
         break;
-      }
-      case 'zigzag': {
-        // Ilusi zigzag dengan dash pendek dan gap sedang
-        svg.push(`<circle ${commonAttrs} style="stroke-dasharray: 4 8;" stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
+      case 'zigzag':
+        progressStyle = `stroke-dasharray: 4 8; stroke-linecap: butt; ${animContent}`;
         break;
-      }
       case 'gradient': {
         const gradId = `ringGrad-${Date.now()}`;
         svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
         svg.push(`<stop offset="0%" stop-color="#${ringColor}" />`);
         svg.push(`<stop offset="100%" stop-color="#${textColor}" />`);
         svg.push(`</linearGradient></defs>`);
-        svg.push(`<circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke="url(#${gradId})" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" stroke-linecap="round" ${transformAttr} ${animStyle} />`);
+        progressStroke = `url(#${gradId})`;
+        progressStyle = animContent;
         break;
       }
-      case 'streak': {
-        // Lingkaran progres
-        svg.push(`<circle ${commonAttrs} stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
-        // Ikon api di ujung progres
-        const angleDeg = -90 + ((stats.rank.percentile || 0) / 100) * 360;
-        const rad = (angleDeg * Math.PI) / 180;
-        const flameX = cx + RANK_RADIUS * Math.cos(rad);
-        const flameY = cy + RANK_RADIUS * Math.sin(rad);
-        const flamePath = octiconPaths['flame'];
-        if (flamePath) {
-          svg.push(`<g transform="translate(${flameX - 8}, ${flameY - 8})">`);
-          svg.push(`<svg viewBox="0 0 16 16" width="16" height="16" fill="#${ringColor}"><path d="${flamePath}"/></svg>`);
-          svg.push(`</g>`);
-        }
+      case 'streak':
+        progressStyle = animContent;
         break;
-      }
-      default: { // default solid
-        svg.push(`<circle ${commonAttrs} stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
+      default:
+        progressStyle = animContent;
         break;
+    }
+
+    // Lingkaran progres
+    svg.push(`<circle ${commonAttrs} stroke="${progressStroke}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} style="${progressStyle}" />`);
+
+    // Ikon api untuk streak
+    if (ringDesign === 'streak') {
+      const angleDeg = -90 + ((stats.rank.percentile || 0) / 100) * 360;
+      const rad = (angleDeg * Math.PI) / 180;
+      const flameX = cx + RANK_RADIUS * Math.cos(rad);
+      const flameY = cy + RANK_RADIUS * Math.sin(rad);
+      const flamePath = octiconPaths['flame'];
+      if (flamePath) {
+        svg.push(`<g transform="translate(${flameX - 8}, ${flameY - 8})">`);
+        svg.push(`<svg viewBox="0 0 16 16" width="16" height="16" fill="#${ringColor}"><path d="${flamePath}"/></svg>`);
+        svg.push(`</g>`);
       }
     }
 
@@ -275,35 +277,25 @@ export async function renderStatsCard(stats, options = {}) {
           svg.push(`<defs><clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="32" /></clipPath></defs>`);
           svg.push(`<image x="${cx - 32}" y="${cy - 32}" width="64" height="64" clip-path="url(#${clipId})" href="${avatarData}" preserveAspectRatio="xMidYMid slice" />`);
         } else {
-          svg.push(`<g class="rank-text">`);
-          svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
-          svg.push(`</g>`);
+          svg.push(`<g class="rank-text"><text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text></g>`);
         }
       } else {
-        svg.push(`<g class="rank-text">`);
-        svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
-        svg.push(`</g>`);
+        svg.push(`<g class="rank-text"><text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text></g>`);
       }
     } else if (rankIcon === 'github') {
       const githubPath = octiconPaths['mark-github'];
       if (githubPath) {
         svg.push(`<g transform="translate(${cx - 32}, ${cy - 32})">`);
-        svg.push(`<svg viewBox="0 0 16 16" width="64" height="64" fill="#${textColor}">`);
-        svg.push(`<path d="${githubPath}"/>`);
-        svg.push(`</svg>`);
+        svg.push(`<svg viewBox="0 0 16 16" width="64" height="64" fill="#${textColor}"><path d="${githubPath}"/></svg>`);
         svg.push(`</g>`);
       } else {
-        svg.push(`<g class="rank-text">`);
-        svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
-        svg.push(`</g>`);
+        svg.push(`<g class="rank-text"><text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text></g>`);
       }
     } else if (rankIcon === 'percent') {
       svg.push(`<text x="-5" y="-7" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 12px;">TOP</text>`);
       svg.push(`<text x="-5" y="12" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 16px;">${stats.rank.percentile}%</text>`);
     } else {
-      svg.push(`<g class="rank-text">`);
-      svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
-      svg.push(`</g>`);
+      svg.push(`<g class="rank-text"><text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text></g>`);
     }
     svg.push(`</g>`);
   }
