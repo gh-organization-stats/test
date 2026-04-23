@@ -1,3 +1,4 @@
+// src/stats/renderer.js
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
@@ -84,6 +85,7 @@ export async function renderStatsCard(stats, options = {}) {
   const allBold = options.all_bold === 'true';
   const photoResize = options.photo_resize || 80;
   const photoQuality = options.photo_quality || 90;
+  const ringDesign = options.ring_design || 'default';
 
   const fontFamily = "'Segoe UI', Ubuntu, Sans-Serif";
 
@@ -199,14 +201,45 @@ export async function renderStatsCard(stats, options = {}) {
   if (!hideRank && stats.rank) {
     const cx = -10;
     const cy = 8;
+    const circ = 2 * Math.PI * RANK_RADIUS;
+    const target = ((100 - (stats.rank?.percentile || 0)) / 100) * circ;
+
     svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
     svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
-    svg.push(`<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
 
+    // Lingkaran progress dengan variasi desain
+    const progressCircle = (() => {
+      if (ringDesign === 'gradient') {
+        const gradId = `ringGradient-${Date.now()}`;
+        svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
+        svg.push(`<stop offset="0%" stop-color="#${ringColor}" />`);
+        svg.push(`<stop offset="100%" stop-color="#${textColor}" />`);
+        svg.push(`</linearGradient></defs>`);
+        return `<circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke="url(#${gradId})" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : circ}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})" style="animation: ${disableAnimations ? 'none' : 'rankAnimation 1s forwards ease-in-out'}; transform-origin: ${cx}px ${cy}px;" />`;
+      } else if (ringDesign === 'double') {
+        // Lingkaran utama
+        let mainCircle = `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`;
+        // Lingkaran dalam
+        let innerCircle = `<circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS - 5}" fill="none" stroke="#${ringColor}" stroke-width="3" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : circ}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})" class="rank-circle" style="animation: rankAnimation 1s forwards ease-in-out;" />`;
+        svg.push(innerCircle); // inner dulu agar di bawah
+        return mainCircle;
+      } else if (ringDesign === 'dashed') {
+        return `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" style="stroke-dasharray: 15 10;" />`;
+      } else if (ringDesign === 'dotted') {
+        return `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" style="stroke-dasharray: 3 7; stroke-linecap: round;" />`;
+      } else if (ringDesign === 'thick') {
+        return `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" style="stroke-width: 10;" />`;
+      } else { // default
+        return `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`;
+      }
+    })();
+
+    svg.push(progressCircle);
+
+    // Konten rank
     if (rankIcon === 'avatar') {
       let avatarData = stats.avatarBase64;
       if (!avatarData && stats.avatarUrl) {
-        // fallback fetch (jarang terjadi karena cache sudah ada)
         const response = await fetch(stats.avatarUrl);
         if (response.ok) {
           const buffer = await response.buffer();
@@ -215,7 +248,6 @@ export async function renderStatsCard(stats, options = {}) {
         }
       }
       if (avatarData) {
-        // Proses ulang jika parameter resize/quality diberikan
         if (options.photo_resize || options.photo_quality) {
           avatarData = await processAvatarFromBase64(avatarData, photoResize, photoQuality);
         }

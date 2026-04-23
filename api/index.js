@@ -4,7 +4,7 @@ import { renderStatsCard } from '../src/stats/renderer.js';
 
 export default async function handler(req, res) {
   try {
-    const { org, exclude, theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon, all_bold, photo_resize, photo_quality } = req.query;
+    const { org, exclude, theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon, all_bold, photo_resize, photo_quality, ring_design } = req.query;
 
     if (!org) throw new Error('Parameter "org" is required');
 
@@ -33,7 +33,8 @@ export default async function handler(req, res) {
     const svg = await renderStatsCard(stats, {
       theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon, all_bold,
       photo_resize: resize,
-      photo_quality: quality
+      photo_quality: quality,
+      ring_design
     });
 
     res.setHeader('Content-Type', 'image/svg+xml');
