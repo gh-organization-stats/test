@@ -1,9 +1,9 @@
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
-import fetch from 'node-fetch'; // untuk fetch avatar
+import fetch from 'node-fetch';
 
-// Konstanta yang diambil langsung dari contoh SVG
+// Konstanta
 const PADDING = 25;
 const TITLE_Y = 35;
 const CARD_BODY_Y = 55;
@@ -26,7 +26,7 @@ function cleanColor(c) {
 }
 const colorAttr = (c) => `#${cleanColor(c)}`;
 
-// Definisi metrik yang akan ditampilkan
+// Definisi metrik
 const METRIC_DEFS = {
   totalStars:    { label: 'Total Stars Earned:', icon: 'star' },
   totalForks:    { label: 'Total Forks:', icon: 'repo-forked' },
@@ -46,7 +46,6 @@ const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
-// Fungsi untuk fetch gambar dan konversi ke base64
 async function fetchImageAsBase64(url) {
   try {
     const response = await fetch(url);
@@ -208,9 +207,8 @@ export async function renderStatsCard(stats, options = {}) {
         svg.push(`<defs><clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS - 2}" /></clipPath></defs>`);
         svg.push(`<image x="${cx - RANK_RADIUS}" y="${cy - RANK_RADIUS}" width="${RANK_RADIUS * 2}" height="${RANK_RADIUS * 2}" clip-path="url(#${clipId})" href="${base64Avatar}" preserveAspectRatio="xMidYMid slice" />`);
       } else {
-        // fallback ke huruf
         svg.push(`<g class="rank-text">`);
-        svg.push(`<text x="${cx + 5}" y="${cy + 3}" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+        svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
         svg.push(`</g>`);
       }
     } else if (rankIcon === 'github') {
@@ -220,17 +218,15 @@ export async function renderStatsCard(stats, options = {}) {
         svg.push(`<path d="${githubPath}"/>`);
         svg.push(`</g>`);
       } else {
-        // fallback
         svg.push(`<g class="rank-text">`);
-        svg.push(`<text x="${cx + 5}" y="${cy + 3}" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+        svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
         svg.push(`</g>`);
       }
     } else if (rankIcon === 'percent') {
-      svg.push(`<text x="${cx + 5}" y="${cy + 3}" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" font-size="16">${stats.rank.percentile}%</text>`);
+      svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" font-size="16">${stats.rank.percentile}%</text>`);
     } else {
-      // default
       svg.push(`<g class="rank-text">`);
-      svg.push(`<text x="${cx + 5}" y="${cy + 3}" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+      svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
       svg.push(`</g>`);
     }
     svg.push(`</g>`);
