@@ -133,41 +133,41 @@ export async function renderStatsCard(stats, options = {}) {
 
   const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
-  
-  // Lebar area metrik saja
   const metricsContentW = maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP;
-  const contentW = Math.max(titleW, metricsContentW);
-  
-  let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
-  
-  let width = Math.max(
-    cardWidthOpt || 0,
-    contentW + 2 * PADDING + rankSpace + EXTRA_WIDTH,
-    350
-  );
 
+  // Posisi rank circle (hanya dipengaruhi area metrik)
   let rankCircleX = 0, rankCircleY = 0;
-  
   if (!hideRank && stats.rank) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
     rankCircleY = (statsAreaHeight / 2) - 15;
 
     const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
     const minX = leftContentRight + 70;
-
-    // Lebar dasar yang hanya mencakup metrik (tanpa judul panjang)
-    const baseWidth = metricsContentW + 2 * PADDING + rankSpace + EXTRA_WIDTH;
+    // defaultX dari lebar yang hanya menampung metrik+rank
+    const baseWidth = metricsContentW + 2 * PADDING + (RANK_RADIUS * 2 + 30) + EXTRA_WIDTH;
     const defaultX = baseWidth - PADDING - RIGHT_MARGIN - RANK_RADIUS;
-    let desiredX = Math.max(defaultX, minX);
+    rankCircleX = Math.max(defaultX, minX);
+  }
 
-    const requiredWidth = desiredX + RANK_RADIUS + PADDING + RIGHT_MARGIN;
+  // Lebar kartu: cukup untuk konten (judul atau metrik) + rank
+  let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
+  let width = Math.max(
+    cardWidthOpt || 0,
+    Math.max(titleW, metricsContentW) + 2 * PADDING + rankSpace + EXTRA_WIDTH,
+    350
+  );
+
+  // Pastikan rank circle tidak terpotong di kanan
+  if (!hideRank && stats.rank) {
+    const requiredWidth = rankCircleX + RANK_RADIUS + PADDING + RIGHT_MARGIN;
     if (requiredWidth > width) {
       width = requiredWidth;
-      // Update rankSpace untuk perhitungan wrap judul
-      rankSpace = width - (contentW + 2 * PADDING);
     }
-    rankCircleX = desiredX;
   }
+
+  // Update rankSpace setelah width final (untuk wrap judul)
+  rankSpace = width - (Math.max(titleW, metricsContentW) + 2 * PADDING);
+  if (rankSpace < 0) rankSpace = 0;
 
   const titleLines = wrapText(customTitle, width - 2 * PADDING - rankSpace, TITLE_FONT_SIZE);
   const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
