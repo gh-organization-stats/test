@@ -59,33 +59,29 @@ export function wrapText(text, maxWidth, fontSize) {
     return lines.length ? lines : [String(text)];
 }
 
-// ===== FUNGSI INI DIAMBIL PERSIS DARI github-readme-stats =====
+// ===== DIAMBIL PERSIS DARI github-readme-stats/src/common/utils.js =====
 const thin = 0.4;
 const normal = 0.55;
 const wide = 0.7;
 
 const CHAR_WIDTH_MAP = {
-    // Huruf besar
-    A: wide, B: wide, C: wide, D: wide, E: wide, F: wide, G: wide, H: wide, I: thin, J: wide, K: wide, L: wide, M: wide,
-    N: wide, O: wide, P: wide, Q: wide, R: wide, S: wide, T: wide, U: wide, V: wide, W: wide, X: wide, Y: wide, Z: wide,
-    // Huruf kecil
-    a: normal, b: normal, c: normal, d: normal, e: normal, f: thin, g: normal, h: normal, i: thin, j: thin, k: normal,
-    l: thin, m: wide, n: normal, o: normal, p: normal, q: normal, r: thin, s: normal, t: thin, u: normal, v: normal,
-    w: wide, x: normal, y: normal, z: normal,
-    // Angka
-    '0': wide, '1': thin, '2': normal, '3': normal, '4': normal, '5': normal, '6': normal, '7': normal, '8': normal, '9': normal,
-    // Simbol umum
-    ' ': thin, '.': thin, ',': thin, ':': thin, ';': thin, '!': thin, '?': normal, '"': normal, "'": thin, '-': thin,
-    '_': normal, '@': wide, '#': wide, '$': normal, '%': wide, '&': wide, '*': normal, '(': thin, ')': thin, '+': normal,
-    '=': normal, '<': normal, '>': normal, '/': thin, '\\': thin, '|': thin
+  A: wide, B: wide, C: wide, D: wide, E: wide, F: wide, G: wide, H: wide, I: thin, J: wide, K: wide, L: wide, M: wide,
+  N: wide, O: wide, P: wide, Q: wide, R: wide, S: wide, T: wide, U: wide, V: wide, W: wide, X: wide, Y: wide, Z: wide,
+  a: normal, b: normal, c: normal, d: normal, e: normal, f: thin, g: normal, h: normal, i: thin, j: thin, k: normal,
+  l: thin, m: wide, n: normal, o: normal, p: normal, q: normal, r: thin, s: normal, t: thin, u: normal, v: normal,
+  w: wide, x: normal, y: normal, z: normal,
+  '0': wide, '1': thin, '2': normal, '3': normal, '4': normal, '5': normal, '6': normal, '7': normal, '8': normal, '9': normal,
+  ' ': thin, '.': thin, ',': thin, ':': thin, ';': thin, '!': thin, '?': normal, '"': normal, "'": thin, '-': thin,
+  _: normal, '@': wide, '#': wide, $: normal, '%': wide, '&': wide, '*': normal, '(': thin, ')': thin, '+': normal,
+  '=': normal, '<': normal, '>': normal, '/': thin, '\\': thin, '|': thin,
 };
 
 export function measureTextWidth(text, fontSize) {
-    if (!text) return 0;
-    let width = 0;
-    for (const char of String(text)) {
-        const multiplier = CHAR_WIDTH_MAP[char] || normal;
-        width += multiplier * fontSize;
-    }
-    return width;
+  if (!text) return 0;
+  let width = 0;
+  for (const char of String(text)) {
+    const multiplier = CHAR_WIDTH_MAP[char] || normal;
+    width += multiplier * fontSize;
+  }
+  return width;
 }
