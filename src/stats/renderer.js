@@ -124,32 +124,39 @@ export async function renderStatsCard(stats, options = {}) {
   });
 
   const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
-  const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
-  const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP);
-  let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
-  let width = Math.max(cardWidthOpt || 0, contentW + 2 * PADDING + rankSpace + EXTRA_WIDTH, 350);
+  // Lebar konten metrik (label + gap + nilai + icon)
+  const metricsContentW = maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP;
+  
+  // Ruang untuk rank circle di kanan (tetap)
+  const rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
 
-  let rankCircleX = 0, rankCircleY = 0;
-  if (!hideRank && stats.rank) {
-    const statsAreaHeight = statItems.length * LINE_HEIGHT;
-    rankCircleY = (statsAreaHeight / 2) - 15;
-    const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
-    const minX = leftContentRight + 70;
-    const defaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
-    let desiredX = Math.max(defaultX, minX);
-    const requiredWidth = desiredX + RANK_RADIUS + PADDING + RIGHT_MARGIN;
-    if (requiredWidth > width) {
-      width = requiredWidth + EXTRA_WIDTH;
-      const newDefaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
-      desiredX = Math.max(newDefaultX, minX);
-      rankSpace = width - (contentW + 2 * PADDING);
-    }
-    rankCircleX = desiredX;
+  // Lebar kartu minimum berdasarkan metrik
+  let width = Math.max(
+    cardWidthOpt || 0,
+    metricsContentW + PADDING + rankSpace + RIGHT_MARGIN + EXTRA_WIDTH,
+    350
+  );
+
+  // Wrap judul dengan lebar yang tersedia di kiri rank circle
+  const availableTitleWidth = width - PADDING - rankSpace - RIGHT_MARGIN;
+  const titleLines = wrapText(customTitle, availableTitleWidth, TITLE_FONT_SIZE);
+  const titleW = Math.max(...titleLines.map(l => measureTextWidth(l, TITLE_FONT_SIZE)));
+
+  // Periksa apakah judul membutuhkan lebar lebih besar, jika ya, perbesar width
+  const titleRequiredWidth = titleW + PADDING + rankSpace + RIGHT_MARGIN;
+  if (titleRequiredWidth > width) {
+    width = titleRequiredWidth;
   }
 
-  const titleLines = wrapText(customTitle, width - 2 * PADDING - rankSpace, TITLE_FONT_SIZE);
   const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
   const height = CARD_BODY_Y + statItems.length * LINE_HEIGHT + PADDING;
+
+  // Rank circle selalu di kanan dengan jarak tetap
+  const rankCircleX = hideRank ? 0 : width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
+  const rankCircleY = hideRank ? 0 : (statItems.length * LINE_HEIGHT) / 2 - 15;
+
+  // Batas kanan untuk nilai metrik (agar tidak menabrak rank circle)
+  const maxValueX = hideRank ? (width - PADDING) : (rankCircleX - 30);
 
   const svg = [];
   svg.push(`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="descId">`);
@@ -168,7 +175,6 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
   svg.push(`.rank-circle-rim { stroke: #${ringColor}; fill: none; stroke-width: ${RANK_STROKE}; opacity: 0.2; }`);
   svg.push(`.rank-circle { stroke: #${ringColor}; stroke-dasharray: 250; fill: none; stroke-width: ${RANK_STROKE}; stroke-linecap: round; opacity: 0.8; transform-origin: -10px 8px; transform: rotate(-90deg); animation: rankAnimation 1s forwards ease-in-out; }`);
-  
   const circumference = 2 * Math.PI * RANK_RADIUS;
   const targetOffset = circumference * (1 - (stats.rank?.percentile || 0) / 100);
   svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: ${circumference}; } to { stroke-dashoffset: ${targetOffset}; } }`);
@@ -188,7 +194,9 @@ export async function renderStatsCard(stats, options = {}) {
   }
 
   svg.push(`<g data-testid="card-title" transform="translate(${PADDING}, ${TITLE_Y})">`);
-  svg.push(`<g transform="translate(0, 0)"><text x="0" y="0" class="header" data-testid="header">${escapeXml(customTitle)}</text></g>`);
+  titleLines.forEach((line, i) => {
+    svg.push(`<text x="0" y="${i * (TITLE_FONT_SIZE + 4)}" class="header" data-testid="header">${escapeXml(line)}</text>`);
+  });
   svg.push(`</g>`);
 
   svg.push(`<g data-testid="main-card-body" transform="translate(0, ${CARD_BODY_Y})">`);
@@ -237,10 +245,6 @@ export async function renderStatsCard(stats, options = {}) {
   }
 
   svg.push(`<svg x="0" y="0">`);
-  
-  // Tentukan batas kanan untuk nilai metrik agar tidak menabrak rank circle
-  const maxValueX = hideRank ? (width - PADDING) : (rankCircleX - 30);
-  
   statItems.forEach((item, index) => {
     const yOffset = index * LINE_HEIGHT;
     const delay = 450 + index * 150;
@@ -252,7 +256,6 @@ export async function renderStatsCard(stats, options = {}) {
       svg.push(`</svg>`);
     }
     const labelX = showIcons ? ICON_SIZE + ICON_SPACING : 0;
-    // Posisi nilai dibatasi agar tidak melebihi batas kanan
     const valueX = Math.min(labelX + maxLabelW + LABEL_VALUE_GAP, maxValueX);
     svg.push(`<text class="stat-label" x="${labelX}" y="12.5">${escapeXml(item.label)}</text>`);
     svg.push(`<text class="stat-value" x="${valueX}" y="12.5" data-testid="${item.key}">${escapeXml(item.value)}</text>`);
