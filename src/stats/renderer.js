@@ -1,9 +1,9 @@
-// src/stats/renderer.js
+// Nilai layout diambil langsung dari contoh SVG asli (anuraghazra/github-readme-stats)
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 
-// Nilai layout diambil langsung dari contoh SVG asli
+// Konstanta persis dari repo asli
 const PADDING = 25;
 const LINE_HEIGHT = 25;
 const TITLE_FONT_SIZE = 18;
@@ -12,7 +12,7 @@ const RANK_RADIUS = 40;
 const RANK_STROKE = 5;
 const ICON_SIZE = 16;
 const ICON_SPACING = 6;
-const LABEL_VALUE_SPACING = 10; // jarak antara label terpanjang dan nilai
+const LABEL_VALUE_SPACING = 10;
 
 function cleanColor(c) {
   if (!c) return 'ffffff';
@@ -27,7 +27,7 @@ function flexLayout({ items, gap, direction }) {
   return items.map((item, i) => `<g transform="translate(0, ${i * gap})">${item}</g>`);
 }
 
-// Metrik yang ditampilkan (sesuai kebutuhan)
+// Metrik yang ditampilkan (hanya isi yang disesuaikan)
 const METRIC_DEFS = {
   totalStars:    { label: 'Total Stars', icon: 'star' },
   totalForks:    { label: 'Total Forks', icon: 'repo-forked' },
@@ -90,7 +90,6 @@ export function renderStatsCard(stats, options = {}) {
     }
   }
 
-  // Hitung lebar teks terpanjang
   let maxLabelW = 0, maxValueW = 0;
   statItems.forEach(item => {
     const lw = measureTextWidth(item.label + ':', METRIC_FONT_SIZE);
