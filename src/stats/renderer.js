@@ -167,8 +167,6 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`.stagger { opacity: 0; animation: fadeInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.rank-text { font: 800 24px ${fontFamily}; fill: #${textColor}; animation: scaleInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
-
-  // Definisi dasar rank-circle (akan dioverride oleh style inline jika ada desain khusus)
   svg.push(`.rank-circle-rim { stroke: #${ringColor}; fill: none; stroke-width: ${RANK_STROKE}; opacity: 0.2; }`);
   svg.push(`.rank-circle { stroke: #${ringColor}; stroke-dasharray: 250; fill: none; stroke-width: ${RANK_STROKE}; stroke-linecap: round; opacity: 0.8; transform-origin: -10px 8px; transform: rotate(-90deg); animation: rankAnimation 1s forwards ease-in-out; }`);
   svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: 251.32741228718345; } to { stroke-dashoffset: ${251.32741228718345 * (1 - (stats.rank?.percentile || 0) / 100)}; } }`);
@@ -207,55 +205,37 @@ export async function renderStatsCard(stats, options = {}) {
       svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
     }
 
-    // Siapkan atribut lingkaran progres
-    let circleAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="round" class="rank-circle"`;
-    let strokeColor = `#${ringColor}`;
+    // Siapkan lingkaran progres
+    let progressAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="round" class="rank-circle"`;
+    let strokeValue = `#${ringColor}`;
     let inlineStyle = '';
 
-    switch (ringDesign) {
-      case 'dash':
-        circleAttrs += ` stroke-width="4"`; // lebih ramping
-        inlineStyle = `stroke-dasharray: 2 6; stroke-linecap: butt;`;
-        break;
-      case 'zigzag':
-        inlineStyle = `stroke-dasharray: 4 4; stroke-linecap: round;`;
-        break;
-      case 'gradient':
-        const gradId = `ringGrad-${Date.now()}`;
-        svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
-        svg.push(`<stop offset="0%" stop-color="#${ringColor}" />`);
-        svg.push(`<stop offset="100%" stop-color="#${textColor}" />`);
-        svg.push(`</linearGradient></defs>`);
-        strokeColor = `url(#${gradId})`;
-        break;
-      default: // default solid, tidak ada inlineStyle khusus
-        break;
-    }
-
-    // Animasi ditambahkan jika tidak dinonaktifkan
-    if (!disableAnimations && ringDesign !== 'dash' && ringDesign !== 'zigzag' && ringDesign !== 'gradient') {
-      // default menggunakan kelas CSS, tidak perlu style inline
-      svg.push(`<circle ${circleAttrs} stroke="${strokeColor}" stroke-dasharray="${circ}" stroke-dashoffset="${target}" ${transformAttr} />`);
+    if (ringDesign === 'gradient') {
+      const gradId = `ringGrad-${Date.now()}`;
+      svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
+      svg.push(`<stop offset="0%" stop-color="#${ringColor}" />`);
+      svg.push(`<stop offset="100%" stop-color="#${textColor}" />`);
+      svg.push(`</linearGradient></defs>`);
+      strokeValue = `url(#${gradId})`;
+      // Gradient tetap menggunakan kelas rank-circle untuk animasi via CSS
+      svg.push(`<circle ${progressAttrs} stroke="${strokeValue}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} />`);
     } else {
-      // untuk desain dengan style inline, atau jika animasi dimatikan, gunakan style inline
-      if (disableAnimations) {
-        inlineStyle += ` stroke-dashoffset: ${target};`;
+      if (ringDesign === 'dash') {
+        progressAttrs += ` stroke-width="4"`;
+        inlineStyle = `stroke-dasharray: 2 6; stroke-linecap: butt;`;
+      } else if (ringDesign === 'zigzag') {
+        inlineStyle = `stroke-dasharray: 5 7; stroke-linecap: round;`;
       }
-      // Gabungkan animasi jika diperlukan dan tidak disable
-      if (!disableAnimations && (ringDesign === 'dash' || ringDesign === 'zigzag' || ringDesign === 'gradient')) {
+
+      // Tambahkan animasi jika tidak disable
+      if (!disableAnimations) {
         inlineStyle += ` animation: rankAnimation 1s forwards ease-in-out;`;
-        // jika animasi, set stroke-dashoffset ke initial value
-        circleAttrs += ` stroke-dashoffset="251.32741228718345"`;
-      } else if (disableAnimations) {
-        circleAttrs += ` stroke-dashoffset="${target}"`;
-      } else {
-        circleAttrs += ` stroke-dashoffset="251.32741228718345"`;
       }
-      
       if (inlineStyle) {
-        circleAttrs += ` style="${inlineStyle}"`;
+        progressAttrs += ` style="${inlineStyle}"`;
       }
-      svg.push(`<circle ${circleAttrs} stroke="${strokeColor}" stroke-dasharray="${circ}" ${transformAttr} />`);
+
+      svg.push(`<circle ${progressAttrs} stroke="${strokeValue}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} />`);
     }
 
     // Konten rank
