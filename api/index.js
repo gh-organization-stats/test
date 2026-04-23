@@ -4,7 +4,7 @@ import { renderStatsCard } from '../src/stats/renderer.js';
 
 export default async function handler(req, res) {
     try {
-        const { org, exclude, theme, hide, show_icons } = req.query;
+        const { org, exclude, theme, hide, show_icons, rank_icon } = req.query;
 
         if (!org) {
             throw new Error('Parameter "org" is required');
