@@ -167,6 +167,8 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`.stagger { opacity: 0; animation: fadeInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.rank-text { font: 800 24px ${fontFamily}; fill: #${textColor}; animation: scaleInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
+
+  // Definisi dasar rank-circle (akan dioverride oleh style inline jika ada desain khusus)
   svg.push(`.rank-circle-rim { stroke: #${ringColor}; fill: none; stroke-width: ${RANK_STROKE}; opacity: 0.2; }`);
   svg.push(`.rank-circle { stroke: #${ringColor}; stroke-dasharray: 250; fill: none; stroke-width: ${RANK_STROKE}; stroke-linecap: round; opacity: 0.8; transform-origin: -10px 8px; transform: rotate(-90deg); animation: rankAnimation 1s forwards ease-in-out; }`);
   svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: 251.32741228718345; } to { stroke-dashoffset: ${251.32741228718345 * (1 - (stats.rank?.percentile || 0) / 100)}; } }`);
@@ -197,64 +199,63 @@ export async function renderStatsCard(stats, options = {}) {
     const circ = 2 * Math.PI * RANK_RADIUS;
     const target = ((100 - (stats.rank?.percentile || 0)) / 100) * circ;
     const transformAttr = `transform="rotate(-90 ${cx} ${cy})"`;
-    const commonAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-width="${RANK_STROKE}" stroke-linecap="round" class="rank-circle"`;
-    const animContent = disableAnimations ? '' : 'animation: rankAnimation 1s forwards ease-in-out;';
 
     svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
 
-    // Lingkaran latar (kecuali untuk dash yang memang diminta tanpa rim)
+    // Lingkaran latar (kecuali dash)
     if (ringDesign !== 'dash') {
       svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
     }
 
-    let progressStyle = animContent;
-    let progressStroke = `#${ringColor}`;
-    let progressExtra = '';
+    // Siapkan atribut lingkaran progres
+    let circleAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="round" class="rank-circle"`;
+    let strokeColor = `#${ringColor}`;
+    let inlineStyle = '';
 
     switch (ringDesign) {
       case 'dash':
-        // Garis lurus pendek mengitari lingkaran, tanpa rim
-        progressStyle = `stroke-dasharray: 4 8; stroke-linecap: butt; ${animContent}`;
-        break;
-      case 'dotted':
-        progressStyle = `stroke-dasharray: 2 8; stroke-linecap: round; ${animContent}`;
+        circleAttrs += ` stroke-width="4"`; // lebih ramping
+        inlineStyle = `stroke-dasharray: 2 6; stroke-linecap: butt;`;
         break;
       case 'zigzag':
-        progressStyle = `stroke-dasharray: 4 8; stroke-linecap: butt; ${animContent}`;
+        inlineStyle = `stroke-dasharray: 4 4; stroke-linecap: round;`;
         break;
-      case 'gradient': {
+      case 'gradient':
         const gradId = `ringGrad-${Date.now()}`;
         svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
         svg.push(`<stop offset="0%" stop-color="#${ringColor}" />`);
         svg.push(`<stop offset="100%" stop-color="#${textColor}" />`);
         svg.push(`</linearGradient></defs>`);
-        progressStroke = `url(#${gradId})`;
-        progressStyle = animContent;
+        strokeColor = `url(#${gradId})`;
         break;
-      }
-      case 'streak':
-        progressStyle = animContent;
-        break;
-      default:
-        progressStyle = animContent;
+      default: // default solid, tidak ada inlineStyle khusus
         break;
     }
 
-    // Lingkaran progres
-    svg.push(`<circle ${commonAttrs} stroke="${progressStroke}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} style="${progressStyle}" />`);
-
-    // Ikon api untuk streak
-    if (ringDesign === 'streak') {
-      const angleDeg = -90 + ((stats.rank.percentile || 0) / 100) * 360;
-      const rad = (angleDeg * Math.PI) / 180;
-      const flameX = cx + RANK_RADIUS * Math.cos(rad);
-      const flameY = cy + RANK_RADIUS * Math.sin(rad);
-      const flamePath = octiconPaths['flame'];
-      if (flamePath) {
-        svg.push(`<g transform="translate(${flameX - 8}, ${flameY - 8})">`);
-        svg.push(`<svg viewBox="0 0 16 16" width="16" height="16" fill="#${ringColor}"><path d="${flamePath}"/></svg>`);
-        svg.push(`</g>`);
+    // Animasi ditambahkan jika tidak dinonaktifkan
+    if (!disableAnimations && ringDesign !== 'dash' && ringDesign !== 'zigzag' && ringDesign !== 'gradient') {
+      // default menggunakan kelas CSS, tidak perlu style inline
+      svg.push(`<circle ${circleAttrs} stroke="${strokeColor}" stroke-dasharray="${circ}" stroke-dashoffset="${target}" ${transformAttr} />`);
+    } else {
+      // untuk desain dengan style inline, atau jika animasi dimatikan, gunakan style inline
+      if (disableAnimations) {
+        inlineStyle += ` stroke-dashoffset: ${target};`;
       }
+      // Gabungkan animasi jika diperlukan dan tidak disable
+      if (!disableAnimations && (ringDesign === 'dash' || ringDesign === 'zigzag' || ringDesign === 'gradient')) {
+        inlineStyle += ` animation: rankAnimation 1s forwards ease-in-out;`;
+        // jika animasi, set stroke-dashoffset ke initial value
+        circleAttrs += ` stroke-dashoffset="251.32741228718345"`;
+      } else if (disableAnimations) {
+        circleAttrs += ` stroke-dashoffset="${target}"`;
+      } else {
+        circleAttrs += ` stroke-dashoffset="251.32741228718345"`;
+      }
+      
+      if (inlineStyle) {
+        circleAttrs += ` style="${inlineStyle}"`;
+      }
+      svg.push(`<circle ${circleAttrs} stroke="${strokeColor}" stroke-dasharray="${circ}" ${transformAttr} />`);
     }
 
     // Konten rank
