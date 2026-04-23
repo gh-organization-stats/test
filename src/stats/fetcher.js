@@ -2,7 +2,6 @@ import fetch from 'node-fetch';
 import { GITHUB_API_BASE, GITHUB_TOKEN } from '../config.js';
 import { fetchAllOrgRepos, fetchAllReposCommitCounts } from '../github/api.js';
 
-// Cache statistik (6 jam)
 const statsCache = new Map();
 const STATS_CACHE_TTL = 6 * 60 * 60 * 1000;
 
@@ -46,28 +45,25 @@ function calculateRank(stats) {
     const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
 
     const rank =
+        1 -
         (TOTAL_STARS_WEIGHT * log_normal_cdf(stats.totalStars / TOTAL_STARS_MEDIAN) +
-         TOTAL_FORKS_WEIGHT * log_normal_cdf(stats.totalForks / TOTAL_FORKS_MEDIAN) +
-         TOTAL_COMMITS_WEIGHT * exponential_cdf(stats.totalCommits / TOTAL_COMMITS_MEDIAN) +
-         OPEN_PRS_WEIGHT * exponential_cdf(stats.openPRs / OPEN_PRS_MEDIAN) +
-         PUBLIC_REPOS_WEIGHT * log_normal_cdf(stats.publicRepos / PUBLIC_REPOS_MEDIAN) +
-         MEMBERS_WEIGHT * log_normal_cdf(stats.members / MEMBERS_MEDIAN)) /
+            TOTAL_FORKS_WEIGHT * log_normal_cdf(stats.totalForks / TOTAL_FORKS_MEDIAN) +
+            TOTAL_COMMITS_WEIGHT * exponential_cdf(stats.totalCommits / TOTAL_COMMITS_MEDIAN) +
+            OPEN_PRS_WEIGHT * exponential_cdf(stats.openPRs / OPEN_PRS_MEDIAN) +
+            PUBLIC_REPOS_WEIGHT * log_normal_cdf(stats.publicRepos / PUBLIC_REPOS_MEDIAN) +
+            MEMBERS_WEIGHT * log_normal_cdf(stats.members / MEMBERS_MEDIAN)) /
         TOTAL_WEIGHT;
 
-    // Percentile kecil → langka → peringkat tinggi
-    const percentile = formatPercentile((1 - rank) * 100);
-
-    let level = LEVELS[LEVELS.length - 1];
-    for (let i = 0; i < THRESHOLDS.length; i++) {
-        if (percentile <= THRESHOLDS[i]) {
-            level = LEVELS[i];
-            break;
-        }
-    }
+    const percentile = formatPercentile(rank * 100);
+    const levelIndex = THRESHOLDS.findIndex((t) => percentile <= t);
+    const level = LEVELS[levelIndex];
 
     return { level, percentile };
 }
 
+/**
+ * Fetch gambar avatar dan konversi ke base64.
+ */
 async function fetchAvatarAsBase64(url) {
     try {
         const response = await fetch(url);
@@ -100,7 +96,7 @@ export async function fetchOrgStats(org, repos) {
         name: org,
         displayName: org,
         avatarUrl: '',
-        avatarBase64: '',
+        avatarBase64: '', // <-- avatar dalam base64
         totalStars: 0,
         totalForks: 0,
         totalWatchers: 0,
@@ -171,12 +167,13 @@ export async function fetchOrgStats(org, repos) {
 
     stats.rank = calculateRank(stats);
 
+    // Ambil avatar base64 dan simpan di stats
     if (stats.avatarUrl) {
         stats.avatarBase64 = await fetchAvatarAsBase64(stats.avatarUrl);
     }
 
     // Simpan cache hanya untuk full fetch
-    if (!repos._excluded && !statsCache.has(org)) {
+    if (!statsCache.has(org)) {
         statsCache.set(org, {
             data: stats,
             expires: now + STATS_CACHE_TTL
