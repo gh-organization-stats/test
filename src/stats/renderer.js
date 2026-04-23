@@ -229,8 +229,8 @@ export async function renderStatsCard(stats, options = {}) {
       }
       if (avatarData) {
         const clipId = `avatarClip-${Date.now()}`;
-        svg.push(`<defs><clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS - 2}" /></clipPath></defs>`);
-        svg.push(`<image x="${cx - RANK_RADIUS}" y="${cy - RANK_RADIUS}" width="${RANK_RADIUS * 2}" height="${RANK_RADIUS * 2}" clip-path="url(#${clipId})" href="${avatarData}" preserveAspectRatio="xMidYMid slice" />`);
+        svg.push(`<defs><clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="32" /></clipPath></defs>`);
+        svg.push(`<image x="${cx - 32}" y="${cy - 32}" width="64" height="64" clip-path="url(#${clipId})" href="${avatarData}" preserveAspectRatio="xMidYMid slice" />`);
       } else {
         svg.push(`<g class="rank-text">`);
         svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
