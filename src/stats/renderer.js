@@ -2,7 +2,7 @@ import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/for
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 
-// --- Konstanta Layout dari github-readme-stats ---
+// Konstanta dari repo asli
 const PADDING = 25;
 const LINE_HEIGHT = 25;
 const TITLE_FONT_SIZE = 18;
@@ -12,7 +12,6 @@ const RANK_STROKE = 5;
 const ICON_SIZE = 16;
 const ICON_SPACING = 6;
 
-// --- Helper Warna ---
 function cleanColor(c) {
     if (!c) return 'ffffff';
     let cleaned = String(c).trim().replace(/^#/, '');
@@ -21,7 +20,7 @@ function cleanColor(c) {
 }
 const colorAttr = (c) => `#${cleanColor(c)}`;
 
-// --- Definisi Metrik ---
+// Definisi metrik
 const METRIC_DEFS = {
     totalStars:    { label: 'Total Stars', icon: 'star' },
     totalForks:    { label: 'Total Forks', icon: 'repo-forked' },
@@ -41,8 +40,9 @@ const CORE_METRICS = new Set([
     'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
-// --- Fungsi Layout Vertikal ---
-function flexLayout({ items, gap }) {
+// Flex layout vertikal (diambil dari repo asli)
+function flexLayout({ items, gap, direction }) {
+    if (direction !== 'column') return items;
     return items.map((item, i) => `<g transform="translate(0, ${i * gap})">${item}</g>`);
 }
 
@@ -77,7 +77,7 @@ export function renderStatsCard(stats, options = {}) {
     }
     const bgColor = cleanColor(rawBgColor);
 
-    // Kumpulkan metrik
+    // Kumpulkan metrik yang akan ditampilkan
     const statItems = [];
     for (const [key, def] of Object.entries(METRIC_DEFS)) {
         if (hide.has(key)) continue;
@@ -92,7 +92,7 @@ export function renderStatsCard(stats, options = {}) {
         }
     }
 
-    // --- Hitung lebar teks ---
+    // Hitung lebar teks (label dan nilai)
     let maxLabelW = 0, maxValueW = 0;
     statItems.forEach(item => {
         const lw = measureTextWidth(item.label + ':', METRIC_FONT_SIZE);
@@ -103,7 +103,7 @@ export function renderStatsCard(stats, options = {}) {
 
     const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
     const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
-    // Lebar konten minimal = judul atau label + nilai + spacing 10
+    // Lebar konten: judul atau label+value+spacing
     const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + 10);
     const rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 20);
     const width = Math.max(cardWidthOpt || 0, contentW + 2 * PADDING + rankSpace, 300);
@@ -112,11 +112,10 @@ export function renderStatsCard(stats, options = {}) {
     const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
     const height = PADDING + titleHeight + 15 + statItems.length * LINE_HEIGHT + PADDING;
 
-    // --- Bangun SVG ---
+    // Bangun SVG
     const svg = [];
     svg.push(`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`);
     
-    // Defs gradient
     if (isGradient) {
         svg.push(`<defs><linearGradient id="${gradientId}" gradientTransform="rotate(${gradientAngle})">`);
         gradientStops.forEach((c, i) => {
@@ -126,7 +125,6 @@ export function renderStatsCard(stats, options = {}) {
         svg.push(`</linearGradient></defs>`);
     }
     
-    // Background
     const bgFill = isGradient ? `url(#${gradientId})` : colorAttr(bgColor);
     if (!hideBorder) {
         svg.push(`<rect width="${width}" height="${height}" rx="${borderRadius}" fill="${bgFill}" stroke="${colorAttr(borderColor)}" stroke-width="2"/>`);
@@ -157,13 +155,13 @@ export function renderStatsCard(stats, options = {}) {
         svg.push(`<text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="9" fill="${colorAttr(textColor)}">${rank.percentile}%</text>`);
     }
     
-    // Metrik (vertical layout dengan alignment kanan yang benar)
+    // Metrik dengan alignment kanan pada kolom nilai
     const metricNodes = statItems.map(item => {
         const iconSvg = (showIcons && item.icon && octiconPaths[item.icon])
             ? `<g transform="translate(0, -3)" fill="${colorAttr(iconColor)}"><path d="${octiconPaths[item.icon]}" fill-rule="evenodd"/></g>`
             : '';
         const labelX = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
-        // Posisi nilai = padding + iconSpace + maxLabelWidth + 10 (spacing antar kolom)
+        // Posisi nilai: labelX + maxLabelW + 10 (spasi antar kolom)
         const valueX = labelX + maxLabelW + 10;
         return `
             <g transform="translate(${PADDING}, 0)">
@@ -173,7 +171,7 @@ export function renderStatsCard(stats, options = {}) {
             </g>
         `;
     });
-    const statsSvg = flexLayout({ items: metricNodes, gap: LINE_HEIGHT }).join('');
+    const statsSvg = flexLayout({ items: metricNodes, gap: LINE_HEIGHT, direction: 'column' }).join('');
     svg.push(`<g transform="translate(0, ${PADDING + titleHeight + 15})">${statsSvg}</g>`);
     svg.push(`</svg>`);
     return svg.join('');

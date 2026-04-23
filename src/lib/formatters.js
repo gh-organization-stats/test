@@ -59,30 +59,33 @@ export function wrapText(text, maxWidth, fontSize) {
     return lines.length ? lines : [String(text)];
 }
 
-/**
- * Fungsi untuk mengukur lebar teks. Meniru logika di github-readme-stats.
- */
+// ===== FUNGSI INI DIAMBIL PERSIS DARI github-readme-stats =====
+const thin = 0.4;
+const normal = 0.55;
+const wide = 0.7;
+
+const CHAR_WIDTH_MAP = {
+    // Huruf besar
+    A: wide, B: wide, C: wide, D: wide, E: wide, F: wide, G: wide, H: wide, I: thin, J: wide, K: wide, L: wide, M: wide,
+    N: wide, O: wide, P: wide, Q: wide, R: wide, S: wide, T: wide, U: wide, V: wide, W: wide, X: wide, Y: wide, Z: wide,
+    // Huruf kecil
+    a: normal, b: normal, c: normal, d: normal, e: normal, f: thin, g: normal, h: normal, i: thin, j: thin, k: normal,
+    l: thin, m: wide, n: normal, o: normal, p: normal, q: normal, r: thin, s: normal, t: thin, u: normal, v: normal,
+    w: wide, x: normal, y: normal, z: normal,
+    // Angka
+    '0': wide, '1': thin, '2': normal, '3': normal, '4': normal, '5': normal, '6': normal, '7': normal, '8': normal, '9': normal,
+    // Simbol umum
+    ' ': thin, '.': thin, ',': thin, ':': thin, ';': thin, '!': thin, '?': normal, '"': normal, "'": thin, '-': thin,
+    '_': normal, '@': wide, '#': wide, '$': normal, '%': wide, '&': wide, '*': normal, '(': thin, ')': thin, '+': normal,
+    '=': normal, '<': normal, '>': normal, '/': thin, '\\': thin, '|': thin
+};
+
 export function measureTextWidth(text, fontSize) {
     if (!text) return 0;
-    const charWidths = {
-        thin: 0.4,
-        normal: 0.55,
-        wide: 0.7
-    };
     let width = 0;
     for (const char of String(text)) {
-        // Karakter lebar: huruf besar, angka, simbol tertentu
-        if (/[A-Z0-9@#%&*()+=?<>{}[\]|]/.test(char)) {
-            width += charWidths.wide * fontSize;
-        }
-        // Karakter sempit: huruf kecil, spasi, titik, koma, dll.
-        else if (/[a-z\s.,;:'"!-]/.test(char)) {
-            width += charWidths.thin * fontSize;
-        }
-        // Default
-        else {
-            width += charWidths.normal * fontSize;
-        }
+        const multiplier = CHAR_WIDTH_MAP[char] || normal;
+        width += multiplier * fontSize;
     }
     return width;
 }
