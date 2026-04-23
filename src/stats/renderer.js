@@ -2,6 +2,7 @@ import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/for
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 import fetch from 'node-fetch';
+import sharp from 'sharp';
 
 // Konstanta
 const PADDING = 25;
@@ -15,10 +16,9 @@ const RANK_STROKE = 6;
 const ICON_SIZE = 16;
 const ICON_SPACING = 9;
 const RIGHT_MARGIN = 20;
-const EXTRA_WIDTH = 40; // hanya untuk area metrik+rank
+const EXTRA_WIDTH = 40;
 const LABEL_VALUE_GAP = 35;
 
-// Fungsi pembersih warna
 function cleanColor(c) {
   if (!c) return 'ffffff';
   let cleaned = String(c).trim().replace(/^#/, '');
@@ -27,7 +27,6 @@ function cleanColor(c) {
 }
 const colorAttr = (c) => `#${cleanColor(c)}`;
 
-// Definisi metrik
 const METRIC_DEFS = {
   totalStars:    { label: 'Total Stars Earned:', icon: 'star' },
   totalForks:    { label: 'Total Forks:', icon: 'repo-forked' },
@@ -47,15 +46,25 @@ const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
-async function fetchImageAsBase64(url) {
+/**
+ * Proses ulang avatar dari base64 dengan sharp (resize & kualitas).
+ */
+async function processAvatarFromBase64(base64Data, size, quality) {
   try {
-    const response = await fetch(url);
-    const buffer = await response.buffer();
-    const contentType = response.headers.get('content-type') || 'image/png';
-    const base64 = buffer.toString('base64');
-    return `data:${contentType};base64,${base64}`;
+    const matches = base64Data.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
+    if (!matches) throw new Error('Invalid base64 data format');
+    const rawBase64 = matches[2];
+    const buffer = Buffer.from(rawBase64, 'base64');
+
+    const processedBuffer = await sharp(buffer)
+      .resize(size, size, { fit: 'cover', withoutEnlargement: true })
+      .jpeg({ quality })
+      .toBuffer();
+
+    const newBase64 = processedBuffer.toString('base64');
+    return `data:image/jpeg;base64,${newBase64}`;
   } catch (e) {
-    console.error('Failed to fetch avatar:', e);
+    console.error('[PROCESS AVATAR] Error:', e);
     return null;
   }
 }
@@ -73,10 +82,11 @@ export async function renderStatsCard(stats, options = {}) {
   const cardWidthOpt = options.card_width ? parseInt(options.card_width) : null;
   const rankIcon = options.rank_icon || 'default';
   const allBold = options.all_bold === 'true';
+  const photoResize = options.photo_resize || 80;
+  const photoQuality = options.photo_quality || 90;
 
   const fontFamily = "'Segoe UI', Ubuntu, Sans-Serif";
 
-  // Warna
   const titleColor = cleanColor(options.title_color || theme.titleColor);
   const textColor = cleanColor(options.text_color || theme.textColor);
   const iconColor = cleanColor(options.icon_color || theme.iconColor);
@@ -84,7 +94,6 @@ export async function renderStatsCard(stats, options = {}) {
   const ringColor = cleanColor(options.ring_color || theme.ringColor);
   const rawBgColor = options.bg_color || theme.bgColor;
 
-  // Gradient
   let isGradient = false, gradientId = null, gradientAngle = 0, gradientStops = [];
   if (typeof rawBgColor === 'string' && rawBgColor.includes(',')) {
     isGradient = true;
@@ -95,7 +104,6 @@ export async function renderStatsCard(stats, options = {}) {
   }
   const bgColor = cleanColor(rawBgColor);
 
-  // Kumpulkan metrik
   const statItems = [];
   for (const [key, def] of Object.entries(METRIC_DEFS)) {
     if (hide.has(key)) continue;
@@ -110,7 +118,6 @@ export async function renderStatsCard(stats, options = {}) {
     }
   }
 
-  // Hitung lebar teks
   let maxLabelW = 0, maxValueW = 0;
   statItems.forEach(item => {
     const lw = measureTextWidth(item.label, METRIC_FONT_SIZE);
@@ -123,24 +130,15 @@ export async function renderStatsCard(stats, options = {}) {
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
   const metricsContentW = maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP;
 
-  // Lebar dasar untuk area metrik + rank circle (dengan EXTRA_WIDTH)
   const rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
   const baseWidth = Math.max(
     metricsContentW + 2 * PADDING + rankSpace + EXTRA_WIDTH,
     350
   );
 
-  // Lebar minimal yang diperlukan untuk judul (tanpa EXTRA_WIDTH)
   const titleMinWidth = (titleW + PADDING) - 15;
+  let width = Math.max(cardWidthOpt || 0, baseWidth, titleMinWidth);
 
-  // Lebar kartu awal: pilih yang terbesar antara baseWidth, titleMinWidth, atau custom
-  let width = Math.max(
-    cardWidthOpt || 0,
-    baseWidth,
-    titleMinWidth
-  );
-
-  // Posisi rank circle (hanya dipengaruhi oleh area metrik, bukan judul)
   let rankCircleX = 0, rankCircleY = 0;
   if (!hideRank && stats.rank) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
@@ -148,38 +146,29 @@ export async function renderStatsCard(stats, options = {}) {
 
     const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
     const minX = leftContentRight + 70;
-    // Posisi default dihitung dari baseWidth (seolah kartu hanya selebar area metrik+rank)
     const defaultX = baseWidth - PADDING - RIGHT_MARGIN - RANK_RADIUS;
     rankCircleX = Math.max(defaultX, minX);
 
-    // Jika rank circle terdorong ke kanan oleh nilai metrik yang panjang, perlebar kartu
     const requiredWidth = rankCircleX + RANK_RADIUS + PADDING + RIGHT_MARGIN;
-    if (requiredWidth > width) {
-      width = requiredWidth;
-    }
+    if (requiredWidth > width) width = requiredWidth;
   }
 
-  // Wrap judul dengan lebar final (tanpa pengurangan rankSpace)
   const titleLines = wrapText(customTitle, width - 2 * PADDING, TITLE_FONT_SIZE);
   const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
   const height = CARD_BODY_Y + statItems.length * LINE_HEIGHT + PADDING;
 
-  // ---- Mulai SVG ----
   const svg = [];
   svg.push(`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="descId">`);
   svg.push(`<title id="titleId">${escapeXml(customTitle)}'s GitHub Stats, Rank: ${stats.rank?.level || 'N/A'}</title>`);
   svg.push(`<desc id="descId">${statItems.map(i => `${i.label} ${i.value}`).join(', ')}</desc>`);
 
-  // Style
   svg.push(`<style>`);
   svg.push(`.header { font: 600 18px ${fontFamily}; fill: #${titleColor}; animation: fadeInAnimation 0.8s ease-in-out forwards; }`);
   svg.push(`@supports(-moz-appearance: auto) { .header { font-size: 15.5px; } }`);
-  
   const labelFontWeight = allBold ? '600' : '400';
   svg.push(`.stat-label { font: ${labelFontWeight} 14px ${fontFamily}; fill: #${textColor}; }`);
   svg.push(`.stat-value { font: 600 14px ${fontFamily}; fill: #${textColor}; }`);
   svg.push(`@supports(-moz-appearance: auto) { .stat-label, .stat-value { font-size:12px; } }`);
-  
   svg.push(`.stagger { opacity: 0; animation: fadeInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.rank-text { font: 800 24px ${fontFamily}; fill: #${textColor}; animation: scaleInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
@@ -190,7 +179,6 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`@keyframes fadeInAnimation { from { opacity: 0; } to { opacity: 1; } }`);
   svg.push(`</style>`);
 
-  // Background
   const bgFill = isGradient ? `url(#${gradientId})` : `#${bgColor}`;
   svg.push(`<rect data-testid="card-bg" x="0.5" y="0.5" rx="${borderRadius}" height="99%" stroke="#${borderColor}" width="${width - 1}" fill="${bgFill}" stroke-opacity="${hideBorder ? '0' : '1'}" />`);
   if (isGradient) {
@@ -202,15 +190,12 @@ export async function renderStatsCard(stats, options = {}) {
     svg.push(`</linearGradient></defs>`);
   }
 
-  // Judul
   svg.push(`<g data-testid="card-title" transform="translate(${PADDING}, ${TITLE_Y})">`);
   svg.push(`<g transform="translate(0, 0)"><text x="0" y="0" class="header" data-testid="header">${escapeXml(customTitle)}</text></g>`);
   svg.push(`</g>`);
 
-  // Body
   svg.push(`<g data-testid="main-card-body" transform="translate(0, ${CARD_BODY_Y})">`);
 
-  // Rank circle
   if (!hideRank && stats.rank) {
     const cx = -10;
     const cy = 8;
@@ -221,30 +206,45 @@ export async function renderStatsCard(stats, options = {}) {
     if (rankIcon === 'avatar') {
       let avatarData = stats.avatarBase64;
       if (!avatarData && stats.avatarUrl) {
-        avatarData = await fetchImageAsBase64(stats.avatarUrl);
+        // fallback fetch (jarang terjadi karena cache sudah ada)
+        const response = await fetch(stats.avatarUrl);
+        if (response.ok) {
+          const buffer = await response.buffer();
+          const contentType = response.headers.get('content-type') || 'image/png';
+          avatarData = `data:${contentType};base64,${buffer.toString('base64')}`;
+        }
       }
       if (avatarData) {
-        const clipId = `avatarClip-${Date.now()}`;
-        svg.push(`<defs><clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="32" /></clipPath></defs>`);
-        svg.push(`<image x="${cx - 32}" y="${cy - 32}" width="64" height="64" clip-path="url(#${clipId})" href="${avatarData}" preserveAspectRatio="xMidYMid slice" />`);
+        // Proses ulang jika parameter resize/quality diberikan
+        if (options.photo_resize || options.photo_quality) {
+          avatarData = await processAvatarFromBase64(avatarData, photoResize, photoQuality);
+        }
+        if (avatarData) {
+          const clipId = `avatarClip-${Date.now()}`;
+          svg.push(`<defs><clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="32" /></clipPath></defs>`);
+          svg.push(`<image x="${cx - 32}" y="${cy - 32}" width="64" height="64" clip-path="url(#${clipId})" href="${avatarData}" preserveAspectRatio="xMidYMid slice" />`);
+        } else {
+          svg.push(`<g class="rank-text">`);
+          svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+          svg.push(`</g>`);
+        }
       } else {
         svg.push(`<g class="rank-text">`);
         svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
         svg.push(`</g>`);
       }
     } else if (rankIcon === 'github') {
-  const githubPath = octiconPaths['mark-github'];
+      const githubPath = octiconPaths['mark-github'];
       if (githubPath) {
-    // Gunakan tag <svg> dengan viewBox yang tepat untuk menskalakan ikon
-    svg.push(`<g transform="translate(${cx - 32}, ${cy - 32})">`);
-    svg.push(`<svg viewBox="0 0 16 16" width="64" height="64" fill="#${textColor}">`);
-    svg.push(`<path d="${githubPath}"/>`);
-    svg.push(`</svg>`);
-    svg.push(`</g>`);
+        svg.push(`<g transform="translate(${cx - 32}, ${cy - 32})">`);
+        svg.push(`<svg viewBox="0 0 16 16" width="64" height="64" fill="#${textColor}">`);
+        svg.push(`<path d="${githubPath}"/>`);
+        svg.push(`</svg>`);
+        svg.push(`</g>`);
       } else {
-    svg.push(`<g class="rank-text">`);
-    svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
-    svg.push(`</g>`);
+        svg.push(`<g class="rank-text">`);
+        svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+        svg.push(`</g>`);
       }
     } else if (rankIcon === 'percent') {
       svg.push(`<text x="-5" y="-7" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 12px;">TOP</text>`);
@@ -257,7 +257,6 @@ export async function renderStatsCard(stats, options = {}) {
     svg.push(`</g>`);
   }
 
-  // Metrik
   svg.push(`<svg x="0" y="0">`);
   statItems.forEach((item, index) => {
     const yOffset = index * LINE_HEIGHT;

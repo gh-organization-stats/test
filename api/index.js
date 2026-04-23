@@ -1,17 +1,23 @@
-// api/index.js (stats card)
 import { fetchAllOrgRepos } from '../src/github/api.js';
 import { fetchOrgStats } from '../src/stats/fetcher.js';
 import { renderStatsCard } from '../src/stats/renderer.js';
 
 export default async function handler(req, res) {
   try {
-    const { org, exclude, theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon, all_bold } = req.query;
+    const { org, exclude, theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon, all_bold, photo_resize, photo_quality } = req.query;
 
     if (!org) throw new Error('Parameter "org" is required');
 
+    let resize = parseInt(photo_resize);
+    if (isNaN(resize) || resize < 10) resize = 80;
+    else if (resize > 250) resize = 250;
+
+    let quality = parseInt(photo_quality);
+    if (isNaN(quality) || quality < 1) quality = 90;
+    else if (quality > 100) quality = 100;
+
     let stats;
     if (exclude) {
-        // Fetch dengan filter exclude, tidak gunakan cache agar tepat
         const repos = await fetchAllOrgRepos(org);
         const excludeList = exclude.split(',').map(s => s.trim().toLowerCase());
         const filteredRepos = repos.filter(repo => {
@@ -21,12 +27,13 @@ export default async function handler(req, res) {
         });
         stats = await fetchOrgStats(org, filteredRepos);
     } else {
-        // Tanpa exclude, biarkan fetchOrgStats mengambil dari cache internal
         stats = await fetchOrgStats(org);
     }
 
     const svg = await renderStatsCard(stats, {
-      theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon, all_bold
+      theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon, all_bold,
+      photo_resize: resize,
+      photo_quality: quality
     });
 
     res.setHeader('Content-Type', 'image/svg+xml');
