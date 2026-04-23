@@ -1,11 +1,9 @@
 // src/stats/renderer.js
-// Salinan persis dari https://github.com/anuraghazra/github-readme-stats/blob/master/src/renderStatsCard.js
-// Hanya bagian METRIC_DEFS dan CORE_METRICS yang diubah
-
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 
+// Nilai layout diambil langsung dari contoh SVG asli
 const PADDING = 25;
 const LINE_HEIGHT = 25;
 const TITLE_FONT_SIZE = 18;
@@ -14,6 +12,7 @@ const RANK_RADIUS = 40;
 const RANK_STROKE = 5;
 const ICON_SIZE = 16;
 const ICON_SPACING = 6;
+const LABEL_VALUE_SPACING = 10; // jarak antara label terpanjang dan nilai
 
 function cleanColor(c) {
   if (!c) return 'ffffff';
@@ -28,7 +27,7 @@ function flexLayout({ items, gap, direction }) {
   return items.map((item, i) => `<g transform="translate(0, ${i * gap})">${item}</g>`);
 }
 
-// ===== HANYA BAGIAN INI YANG DIUBAH =====
+// Metrik yang ditampilkan (sesuai kebutuhan)
 const METRIC_DEFS = {
   totalStars:    { label: 'Total Stars', icon: 'star' },
   totalForks:    { label: 'Total Forks', icon: 'repo-forked' },
@@ -47,7 +46,6 @@ const METRIC_DEFS = {
 const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
-// ===== AKHIR PERUBAHAN =====
 
 export function renderStatsCard(stats, options = {}) {
   const theme = themes[options.theme] || themes.default;
@@ -92,6 +90,7 @@ export function renderStatsCard(stats, options = {}) {
     }
   }
 
+  // Hitung lebar teks terpanjang
   let maxLabelW = 0, maxValueW = 0;
   statItems.forEach(item => {
     const lw = measureTextWidth(item.label + ':', METRIC_FONT_SIZE);
@@ -102,7 +101,7 @@ export function renderStatsCard(stats, options = {}) {
 
   const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
-  const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + 10);
+  const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + LABEL_VALUE_SPACING);
   const rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 20);
   const width = Math.max(cardWidthOpt || 0, contentW + 2 * PADDING + rankSpace, 300);
 
@@ -151,7 +150,7 @@ export function renderStatsCard(stats, options = {}) {
   }
   
   const labelX = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
-  const valueX = labelX + maxLabelW + 10;
+  const valueX = labelX + maxLabelW + LABEL_VALUE_SPACING;
   
   const metricNodes = statItems.map(item => {
     const iconSvg = (showIcons && item.icon && octiconPaths[item.icon])

@@ -59,7 +59,7 @@ export function wrapText(text, maxWidth, fontSize) {
     return lines.length ? lines : [String(text)];
 }
 
-// ===== DIAMBIL PERSIS DARI github-readme-stats/src/common/utils.js =====
+// ===== IDENTIK DENGAN REPO ASLI =====
 const thin = 0.4;
 const normal = 0.55;
 const wide = 0.7;
