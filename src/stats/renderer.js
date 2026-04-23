@@ -1,12 +1,11 @@
 // src/stats/renderer.js
-// Salinan dari https://github.com/anuraghazra/github-readme-stats/blob/master/src/renderStatsCard.js
-// Hanya metrik dan data yang disesuaikan.
+// Salinan persis dari https://github.com/anuraghazra/github-readme-stats/blob/master/src/renderStatsCard.js
+// Hanya bagian METRIC_DEFS dan CORE_METRICS yang diubah
 
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 
-// Konstanta dari repo asli
 const PADDING = 25;
 const LINE_HEIGHT = 25;
 const TITLE_FONT_SIZE = 18;
@@ -24,13 +23,12 @@ function cleanColor(c) {
 }
 const colorAttr = (c) => `#${cleanColor(c)}`;
 
-// Flex layout kolom (dari asli)
 function flexLayout({ items, gap, direction }) {
   if (direction !== 'column') return items;
   return items.map((item, i) => `<g transform="translate(0, ${i * gap})">${item}</g>`);
 }
 
-// Metrik yang akan ditampilkan (disesuaikan)
+// ===== HANYA BAGIAN INI YANG DIUBAH =====
 const METRIC_DEFS = {
   totalStars:    { label: 'Total Stars', icon: 'star' },
   totalForks:    { label: 'Total Forks', icon: 'repo-forked' },
@@ -49,6 +47,7 @@ const METRIC_DEFS = {
 const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
+// ===== AKHIR PERUBAHAN =====
 
 export function renderStatsCard(stats, options = {}) {
   const theme = themes[options.theme] || themes.default;
