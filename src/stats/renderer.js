@@ -1,9 +1,12 @@
 // src/stats/renderer.js
+// Salinan dari https://github.com/anuraghazra/github-readme-stats/blob/master/src/renderStatsCard.js
+// Hanya metrik dan data yang disesuaikan.
+
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
 
-// ===== KONSTANTA DARI REPO ASLI =====
+// Konstanta dari repo asli
 const PADDING = 25;
 const LINE_HEIGHT = 25;
 const TITLE_FONT_SIZE = 18;
@@ -13,7 +16,6 @@ const RANK_STROKE = 5;
 const ICON_SIZE = 16;
 const ICON_SPACING = 6;
 
-// ===== HELPER WARNA =====
 function cleanColor(c) {
   if (!c) return 'ffffff';
   let cleaned = String(c).trim().replace(/^#/, '');
@@ -22,13 +24,13 @@ function cleanColor(c) {
 }
 const colorAttr = (c) => `#${cleanColor(c)}`;
 
-// ===== FLEX LAYOUT DARI REPO ASLI =====
+// Flex layout kolom (dari asli)
 function flexLayout({ items, gap, direction }) {
   if (direction !== 'column') return items;
   return items.map((item, i) => `<g transform="translate(0, ${i * gap})">${item}</g>`);
 }
 
-// ===== METRIK YANG AKAN DITAMPILKAN (DISESUAIKAN) =====
+// Metrik yang akan ditampilkan (disesuaikan)
 const METRIC_DEFS = {
   totalStars:    { label: 'Total Stars', icon: 'star' },
   totalForks:    { label: 'Total Forks', icon: 'repo-forked' },
@@ -48,7 +50,6 @@ const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
-// ===== FUNGSI RENDER UTAMA (DISALIN DARI REPO ASLI) =====
 export function renderStatsCard(stats, options = {}) {
   const theme = themes[options.theme] || themes.default;
   const hide = new Set((options.hide || '').split(',').filter(Boolean));
@@ -61,7 +62,6 @@ export function renderStatsCard(stats, options = {}) {
   const borderRadius = options.border_radius || '4.5';
   const cardWidthOpt = options.card_width ? parseInt(options.card_width) : null;
 
-  // Warna
   const titleColor = cleanColor(options.title_color || theme.titleColor);
   const textColor = cleanColor(options.text_color || theme.textColor);
   const iconColor = cleanColor(options.icon_color || theme.iconColor);
@@ -69,7 +69,6 @@ export function renderStatsCard(stats, options = {}) {
   const ringColor = cleanColor(options.ring_color || theme.ringColor);
   const rawBgColor = options.bg_color || theme.bgColor;
 
-  // Gradient
   let isGradient = false, gradientId = null, gradientAngle = 0, gradientStops = [];
   if (typeof rawBgColor === 'string' && rawBgColor.includes(',')) {
     isGradient = true;
@@ -80,7 +79,6 @@ export function renderStatsCard(stats, options = {}) {
   }
   const bgColor = cleanColor(rawBgColor);
 
-  // Kumpulkan metrik yang akan ditampilkan
   const statItems = [];
   for (const [key, def] of Object.entries(METRIC_DEFS)) {
     if (hide.has(key)) continue;
@@ -95,7 +93,6 @@ export function renderStatsCard(stats, options = {}) {
     }
   }
 
-  // Hitung lebar maksimal label dan nilai (DARI REPO ASLI)
   let maxLabelW = 0, maxValueW = 0;
   statItems.forEach(item => {
     const lw = measureTextWidth(item.label + ':', METRIC_FONT_SIZE);
@@ -114,7 +111,6 @@ export function renderStatsCard(stats, options = {}) {
   const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
   const height = PADDING + titleHeight + 10 + statItems.length * LINE_HEIGHT + PADDING;
 
-  // Mulai SVG
   const svg = [];
   svg.push(`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`);
   
@@ -134,14 +130,12 @@ export function renderStatsCard(stats, options = {}) {
     svg.push(`<rect width="${width}" height="${height}" rx="${borderRadius}" fill="${bgFill}"/>`);
   }
   
-  // Judul
   let y = PADDING + TITLE_FONT_SIZE;
   titleLines.forEach(line => {
     svg.push(`<text x="${PADDING}" y="${y}" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="${TITLE_FONT_SIZE}" font-weight="bold" fill="${colorAttr(titleColor)}">${escapeXml(line)}</text>`);
     y += TITLE_FONT_SIZE + 4;
   });
   
-  // Rank circle (DARI REPO ASLI, HANYA DATA RANK DISESUAIKAN)
   if (!hideRank && stats.rank) {
     const rank = stats.rank;
     const cx = width - PADDING - RANK_RADIUS;
@@ -157,7 +151,6 @@ export function renderStatsCard(stats, options = {}) {
     svg.push(`<text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="9" fill="${colorAttr(textColor)}">${rank.percentile}%</text>`);
   }
   
-  // Metrik (DARI REPO ASLI)
   const labelX = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
   const valueX = labelX + maxLabelW + 10;
   
