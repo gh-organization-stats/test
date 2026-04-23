@@ -72,8 +72,9 @@ export async function renderStatsCard(stats, options = {}) {
   const borderRadius = options.border_radius || '4.5';
   const cardWidthOpt = options.card_width ? parseInt(options.card_width) : null;
   const rankIcon = options.rank_icon || 'default';
+  const allBold = options.all_bold === 'true';
 
-  // Alias font untuk kemudahan penggunaan
+  // Alias font
   const fontAliases = {
     'default': "'Segoe UI', Ubuntu, Sans-Serif",
     'sans': "'Segoe UI', Ubuntu, Sans-Serif",
@@ -174,12 +175,16 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`<title id="titleId">${escapeXml(customTitle)}'s GitHub Stats, Rank: ${stats.rank?.level || 'N/A'}</title>`);
   svg.push(`<desc id="descId">${statItems.map(i => `${i.label} ${i.value}`).join(', ')}</desc>`);
 
-  // Style dengan font dinamis
+  // Style
   svg.push(`<style>`);
   svg.push(`.header { font: 600 18px ${fontFamily}; fill: #${titleColor}; animation: fadeInAnimation 0.8s ease-in-out forwards; }`);
   svg.push(`@supports(-moz-appearance: auto) { .header { font-size: 15.5px; } }`);
-  svg.push(`.stat { font: 600 14px ${fontFamily}; fill: #${textColor}; }`);
-  svg.push(`@supports(-moz-appearance: auto) { .stat { font-size:12px; } }`);
+  
+  const labelFontWeight = allBold ? '600' : '400';
+  svg.push(`.stat-label { font: ${labelFontWeight} 14px ${fontFamily}; fill: #${textColor}; }`);
+  svg.push(`.stat-value { font: 600 14px ${fontFamily}; fill: #${textColor}; }`);
+  svg.push(`@supports(-moz-appearance: auto) { .stat-label, .stat-value { font-size:12px; } }`);
+  
   svg.push(`.stagger { opacity: 0; animation: fadeInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.rank-text { font: 800 24px ${fontFamily}; fill: #${textColor}; animation: scaleInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
@@ -267,8 +272,8 @@ export async function renderStatsCard(stats, options = {}) {
     const labelX = showIcons ? ICON_SIZE + ICON_SPACING : 0;
     const valueX = labelX + maxLabelW + LABEL_VALUE_GAP;
     
-    svg.push(`<text class="stat bold" x="${labelX}" y="12.5">${escapeXml(item.label)}</text>`);
-    svg.push(`<text class="stat bold" x="${valueX}" y="12.5" data-testid="${item.key}">${escapeXml(item.value)}</text>`);
+    svg.push(`<text class="stat-label" x="${labelX}" y="12.5">${escapeXml(item.label)}</text>`);
+    svg.push(`<text class="stat-value" x="${valueX}" y="12.5" data-testid="${item.key}">${escapeXml(item.value)}</text>`);
     svg.push(`</g></g>`);
   });
   svg.push(`</svg>`);
