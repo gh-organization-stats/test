@@ -154,14 +154,16 @@ export function renderStatsCard(stats, options = {}) {
 
   // Rank circle
   if (!hideRank && stats.rank) {
-    const rank = stats.rank;
-    const cx = width - PADDING - RANK_RADIUS;
-    const cy = 5; // contoh pertama 85, kedua 47.5 -> kita ambil rata2 50
-    svg.push(`<g data-testid="rank-circle" transform="translate(${cx}, ${cy})">`);
+    const statsAreaHeight = statItems.length * LINE_HEIGHT;
+    const rankCircleY = statsAreaHeight / 2; // karena sudah di dalam translate(0, CARD_BODY_Y)
+    const rightPadding = PADDING + 10;
+    const rankCircleX = width - rightPadding - RANK_RADIUS;
+
+    svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
     svg.push(`<circle class="rank-circle-rim" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
     svg.push(`<circle class="rank-circle" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
     svg.push(`<g class="rank-text">`);
-    svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${rank.level || 'C+'}</text>`);
+    svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
     svg.push(`</g></g>`);
   }
 
