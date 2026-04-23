@@ -13,6 +13,8 @@ const RANK_RADIUS = 40;
 const RANK_STROKE = 6;
 const ICON_SIZE = 16;
 const ICON_SPACING = 9; // dari icon ke teks = 25 - 16 = 9
+const RIGHT_MARGIN = 20; // jarak dari tepi kanan ke rank circle
+const EXTRA_WIDTH = 40; // tambahan lebar global
 
 // Fungsi pembersih warna
 function cleanColor(c) {
@@ -104,35 +106,33 @@ export function renderStatsCard(stats, options = {}) {
   // Lebar konten minimal (tanpa rank)
   const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + 10);
   
-  // Inisialisasi lebar kartu
-  const rightMargin = 20; // jarak dari tepi kanan ke rank circle
-  let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 20);
-  let width = Math.max(cardWidthOpt || 0, contentW + 2 * PADDING + rankSpace, 300);
+  // Hitung rankSpace dengan margin lebih besar
+  let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
+  
+  // Lebar awal
+  let width = Math.max(
+    cardWidthOpt || 0,
+    contentW + 2 * PADDING + rankSpace + EXTRA_WIDTH,
+    350
+  );
 
-  // Posisi rank circle (akan dihitung ulang setelah width final)
   let rankCircleX = 0, rankCircleY = 0;
   
-  // Hitung posisi dan sesuaikan lebar jika rank aktif
   if (!hideRank && stats.rank) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
     rankCircleY = statsAreaHeight / 2;
 
-    // Batas kiri aman: ujung kanan area konten + jarak ekstra 60px
     const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
-    const minX = leftContentRight + 60; // jarak dari value ke rank circle
+    const minX = leftContentRight + 70; // jarak ekstra dari nilai ke rank circle
 
-    // Posisi default (dari kanan)
-    const defaultX = width - PADDING - rightMargin - RANK_RADIUS;
-
+    const defaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
     let desiredX = Math.max(defaultX, minX);
 
-    // Jika desiredX lebih besar, perlebar kartu agar rightMargin tetap terjaga
-    const requiredWidth = desiredX + RANK_RADIUS + PADDING + rightMargin;
+    const requiredWidth = desiredX + RANK_RADIUS + PADDING + RIGHT_MARGIN;
     if (requiredWidth > width) {
-      width = requiredWidth;
-      rankSpace = requiredWidth - (contentW + 2 * PADDING); // perbarui rankSpace
-      // Hitung ulang defaultX dengan width baru
-      const newDefaultX = width - PADDING - rightMargin - RANK_RADIUS;
+      width = requiredWidth + EXTRA_WIDTH;
+      rankSpace = requiredWidth + EXTRA_WIDTH - (contentW + 2 * PADDING);
+      const newDefaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
       desiredX = Math.max(newDefaultX, minX);
     }
     rankCircleX = desiredX;
