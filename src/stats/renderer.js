@@ -15,7 +15,7 @@ const RANK_STROKE = 6;
 const ICON_SIZE = 16;
 const ICON_SPACING = 9;
 const RIGHT_MARGIN = 20;
-const EXTRA_WIDTH = 40;
+const EXTRA_WIDTH = 40; // hanya untuk area metrik+rank
 const LABEL_VALUE_GAP = 35;
 
 // Fungsi pembersih warna
@@ -135,24 +135,24 @@ export async function renderStatsCard(stats, options = {}) {
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
   const metricsContentW = maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP;
 
-  // Lebar dasar yang hanya mencakup metrik + rank circle
+  // Lebar dasar untuk area metrik + rank circle (dengan EXTRA_WIDTH)
   const rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
   const baseWidth = Math.max(
     metricsContentW + 2 * PADDING + rankSpace + EXTRA_WIDTH,
     350
   );
 
-  // Lebar minimal untuk judul
+  // Lebar minimal yang diperlukan untuk judul (tanpa EXTRA_WIDTH)
   const titleMinWidth = titleW + 2 * PADDING;
 
-  // Lebar kartu final: cukup untuk judul atau area metrik+rank, mana yang lebih besar
+  // Lebar kartu awal: pilih yang terbesar antara baseWidth, titleMinWidth, atau custom
   let width = Math.max(
     cardWidthOpt || 0,
     baseWidth,
     titleMinWidth
   );
 
-  // Posisi rank circle (hanya dipengaruhi area metrik, bukan judul)
+  // Posisi rank circle (hanya dipengaruhi oleh area metrik, bukan judul)
   let rankCircleX = 0, rankCircleY = 0;
   if (!hideRank && stats.rank) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
@@ -160,18 +160,18 @@ export async function renderStatsCard(stats, options = {}) {
 
     const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
     const minX = leftContentRight + 70;
-    // defaultX tetap dari baseWidth (seakan lebar kartu hanya baseWidth)
+    // Posisi default dihitung dari baseWidth (seolah kartu hanya selebar area metrik+rank)
     const defaultX = baseWidth - PADDING - RIGHT_MARGIN - RANK_RADIUS;
     rankCircleX = Math.max(defaultX, minX);
 
-    // Jika rank circle terdorong ke kanan oleh nilai panjang, perlebar kartu
+    // Jika rank circle terdorong ke kanan oleh nilai metrik yang panjang, perlebar kartu
     const requiredWidth = rankCircleX + RANK_RADIUS + PADDING + RIGHT_MARGIN;
     if (requiredWidth > width) {
       width = requiredWidth;
     }
   }
 
-  // Wrap judul dengan lebar yang tersedia (tanpa mengurangi rankSpace)
+  // Wrap judul dengan lebar final (tanpa pengurangan rankSpace)
   const titleLines = wrapText(customTitle, width - 2 * PADDING, TITLE_FONT_SIZE);
   const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
   const height = CARD_BODY_Y + statItems.length * LINE_HEIGHT + PADDING;
