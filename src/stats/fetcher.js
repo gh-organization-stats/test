@@ -3,34 +3,74 @@ import { GITHUB_API_BASE, GITHUB_TOKEN } from '../config.js';
 import { fetchAllOrgRepos, fetchAllReposCommitCounts } from '../github/api.js';
 
 /**
- * Menghitung rank berdasarkan total stars.
- * Level: S (>20k), A+ (10k-20k), A (5k-10k), B+ (2k-5k), B (1k-2k), C+ (500-1k), C (<500)
+ * Calculates the exponential cdf.
+ * @param {number} x The value.
+ * @returns {number} The exponential cdf (0-1).
  */
-function calculateRank(totalStars) {
-    let level, percentile;
-    if (totalStars >= 20000) {
-        level = 'S';
-        percentile = 99;
-    } else if (totalStars >= 10000) {
-        level = 'A+';
-        percentile = 95;
-    } else if (totalStars >= 5000) {
-        level = 'A';
-        percentile = 90;
-    } else if (totalStars >= 2000) {
-        level = 'B+';
-        percentile = 75;
-    } else if (totalStars >= 1000) {
-        level = 'B';
-        percentile = 60;
-    } else if (totalStars >= 500) {
-        level = 'C+';
-        percentile = 40;
-    } else {
-        level = 'C';
-        percentile = 20;
-    }
-    return { level, percentile };
+function exponential_cdf(x) {
+  return 1 - 2 ** -x;
+}
+
+/**
+ * Calculates the log normal cdf approximation.
+ * @param {number} x The value.
+ * @returns {number} The log normal cdf (0-1).
+ */
+function log_normal_cdf(x) {
+  return x / (1 + x);
+}
+
+/**
+ * Calculates the organization's rank using weighted percentiles,
+ * adopting the methodology from github-readme-stats.
+ * @param {object} stats The organization's statistics.
+ * @returns {{ level: string, percentile: number }} The calculated rank.
+ */
+function calculateRank(stats) {
+  // --- MEDIAN VALUES (can be adjusted based on actual data) ---
+  const TOTAL_STARS_MEDIAN = 500;      // Total stars across all repos
+  const TOTAL_FORKS_MEDIAN = 200;      // Total forks across all repos
+  const TOTAL_COMMITS_MEDIAN = 5000;   // Total commits across all repos
+  const OPEN_PRS_MEDIAN = 100;         // Total open PRs across all repos
+  const PUBLIC_REPOS_MEDIAN = 10;       // Number of public repos
+  const MEMBERS_MEDIAN = 5;            // Number of public members
+
+  // --- WEIGHTS (importance factor for each metric) ---
+  const TOTAL_STARS_WEIGHT = 4;
+  const TOTAL_FORKS_WEIGHT = 3;
+  const TOTAL_COMMITS_WEIGHT = 2;
+  const OPEN_PRS_WEIGHT = 1;
+  const PUBLIC_REPOS_WEIGHT = 1;
+  const MEMBERS_WEIGHT = 1;
+
+  const TOTAL_WEIGHT =
+    TOTAL_STARS_WEIGHT +
+    TOTAL_FORKS_WEIGHT +
+    TOTAL_COMMITS_WEIGHT +
+    OPEN_PRS_WEIGHT +
+    PUBLIC_REPOS_WEIGHT +
+    MEMBERS_WEIGHT;
+
+  // --- THRESHOLDS & LEVEL MAPPING (Japanese grading system) ---
+  const THRESHOLDS = [1, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
+  const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
+
+  // Calculate weighted percentile
+  const rank =
+    1 -
+    (TOTAL_STARS_WEIGHT * log_normal_cdf(stats.totalStars / TOTAL_STARS_MEDIAN) +
+      TOTAL_FORKS_WEIGHT * log_normal_cdf(stats.totalForks / TOTAL_FORKS_MEDIAN) +
+      TOTAL_COMMITS_WEIGHT * exponential_cdf(stats.totalCommits / TOTAL_COMMITS_MEDIAN) +
+      OPEN_PRS_WEIGHT * exponential_cdf(stats.openPRs / OPEN_PRS_MEDIAN) +
+      PUBLIC_REPOS_WEIGHT * log_normal_cdf(stats.publicRepos / PUBLIC_REPOS_MEDIAN) +
+      MEMBERS_WEIGHT * log_normal_cdf(stats.members / MEMBERS_MEDIAN)) /
+    TOTAL_WEIGHT;
+
+  const percentile = rank * 100;
+  const levelIndex = THRESHOLDS.findIndex((t) => percentile <= t);
+  const level = LEVELS[levelIndex];
+
+  return { level, percentile };
 }
 
 /**
@@ -70,7 +110,7 @@ export async function fetchOrgStats(org, repos) {
         stats.totalWatchers += repo.watchers_count || 0;
         stats.totalSize += repo.size || 0;
         stats.openIssues += repo.open_issues_count || 0;
-        stats.openPRs += repo.open_prs_count || 0; // diambil dari hasil transformasi GraphQL
+        stats.openPRs += repo.open_prs_count || 0;
         
         if (repo.language) {
             langCount[repo.language] = (langCount[repo.language] || 0) + 1;
@@ -85,7 +125,7 @@ export async function fetchOrgStats(org, repos) {
     }
 
     // --- 3. Ambil data organisasi (REST) ---
-    const headers = GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {};
+    const headers = GITHUB_TOKEN ? { 'Authorization': `Bearer ${GITHUB_TOKEN}` } : {};
     try {
         const orgRes = await fetch(`${GITHUB_API_BASE}/orgs/${org}`, { headers });
         if (orgRes.ok) {
@@ -117,8 +157,8 @@ export async function fetchOrgStats(org, repos) {
         stats.totalCommits = 0;
     }
 
-    // --- 5. Hitung rank berdasarkan total stars ---
-    stats.rank = calculateRank(stats.totalStars);
+    // --- 5. Hitung rank dengan metode weighted percentile yang baru ---
+    stats.rank = calculateRank(stats);
 
     return stats;
 }
