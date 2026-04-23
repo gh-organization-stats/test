@@ -1,3 +1,4 @@
+// src/stats/renderer.js
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
@@ -47,6 +48,7 @@ const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
+// Fungsi fetch avatar (sebagai fallback jika tidak ada di cache)
 async function fetchImageAsBase64(url) {
   try {
     const response = await fetch(url);
@@ -223,12 +225,16 @@ export async function renderStatsCard(stats, options = {}) {
     svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
     svg.push(`<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
 
-    if (rankIcon === 'avatar' && stats.avatarUrl) {
-      const base64Avatar = await fetchImageAsBase64(stats.avatarUrl);
-      if (base64Avatar) {
+    if (rankIcon === 'avatar') {
+      // Gunakan avatarBase64 dari cache jika tersedia, jika tidak fetch ulang
+      let avatarData = stats.avatarBase64;
+      if (!avatarData && stats.avatarUrl) {
+        avatarData = await fetchImageAsBase64(stats.avatarUrl);
+      }
+      if (avatarData) {
         const clipId = `avatarClip-${Date.now()}`;
         svg.push(`<defs><clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS - 2}" /></clipPath></defs>`);
-        svg.push(`<image x="${cx - RANK_RADIUS}" y="${cy - RANK_RADIUS}" width="${RANK_RADIUS * 2}" height="${RANK_RADIUS * 2}" clip-path="url(#${clipId})" href="${base64Avatar}" preserveAspectRatio="xMidYMid slice" />`);
+        svg.push(`<image x="${cx - RANK_RADIUS}" y="${cy - RANK_RADIUS}" width="${RANK_RADIUS * 2}" height="${RANK_RADIUS * 2}" clip-path="url(#${clipId})" href="${avatarData}" preserveAspectRatio="xMidYMid slice" />`);
       } else {
         svg.push(`<g class="rank-text">`);
         svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);

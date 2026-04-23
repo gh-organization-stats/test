@@ -3,38 +3,22 @@ import fetch from 'node-fetch';
 import { GITHUB_API_BASE, GITHUB_TOKEN } from '../config.js';
 import { fetchAllOrgRepos, fetchAllReposCommitCounts } from '../github/api.js';
 
-// Cache untuk hasil fetchOrgStats (6 jam)
 const statsCache = new Map();
 const STATS_CACHE_TTL = 6 * 60 * 60 * 1000;
 
-/**
- * Membulatkan angka menjadi maksimal 1 desimal.
- */
 function formatPercentile(value) {
     const rounded = Math.round(value * 10) / 10;
     return rounded % 1 === 0 ? Math.round(rounded) : rounded;
 }
 
-/**
- * Calculates the exponential cdf.
- */
 function exponential_cdf(x) {
     return 1 - 2 ** -x;
 }
 
-/**
- * Calculates the log normal cdf approximation.
- */
 function log_normal_cdf(x) {
     return x / (1 + x);
 }
 
-/**
- * Menghitung rank organisasi menggunakan weighted percentiles.
- * Mengadopsi metodologi dari github-readme-stats.
- * @param {object} stats - Data statistik organisasi.
- * @returns {{ level: string, percentile: number }} - Hasil perhitungan rank.
- */
 function calculateRank(stats) {
     const TOTAL_STARS_MEDIAN = 500;
     const TOTAL_FORKS_MEDIAN = 200;
@@ -79,15 +63,24 @@ function calculateRank(stats) {
 }
 
 /**
- * Mengambil semua statistik untuk organisasi.
- * @param {string} org - Nama organisasi
- * @param {Array} [repos] - Array repositori (opsional). Jika tidak diberikan, akan diambil dari cache/api.
- * @returns {Promise<Object>} - Objek statistik lengkap
+ * Fetch gambar avatar dan konversi ke base64.
  */
+async function fetchAvatarAsBase64(url) {
+    try {
+        const response = await fetch(url);
+        const buffer = await response.buffer();
+        const contentType = response.headers.get('content-type') || 'image/png';
+        const base64 = buffer.toString('base64');
+        return `data:${contentType};base64,${base64}`;
+    } catch (e) {
+        console.error('Failed to fetch avatar for caching:', e);
+        return null;
+    }
+}
+
 export async function fetchOrgStats(org, repos) {
     const now = Date.now();
 
-    // Jika repos tidak diberikan (full fetch), cek cache
     if (!repos) {
         const cached = statsCache.get(org);
         if (cached && cached.expires > now) {
@@ -95,7 +88,6 @@ export async function fetchOrgStats(org, repos) {
             return cached.data;
         }
         console.log(`[FETCHER] Cache miss for org stats: ${org}. Fetching fresh data...`);
-        // Ambil semua repositori dari api (cache internal 6 jam)
         repos = await fetchAllOrgRepos(org);
     } else {
         console.log(`[FETCHER] Using provided repos (exclude active), skipping cache.`);
@@ -105,6 +97,7 @@ export async function fetchOrgStats(org, repos) {
         name: org,
         displayName: org,
         avatarUrl: '',
+        avatarBase64: '', // <-- avatar dalam base64
         totalStars: 0,
         totalForks: 0,
         totalWatchers: 0,
@@ -124,7 +117,6 @@ export async function fetchOrgStats(org, repos) {
 
     const langCount = {};
 
-    // Hitung metrik dasar dari seluruh repositori
     for (const repo of repos) {
         stats.totalStars += repo.stargazers_count || 0;
         stats.totalForks += repo.forks_count || 0;
@@ -132,20 +124,17 @@ export async function fetchOrgStats(org, repos) {
         stats.totalSize += repo.size || 0;
         stats.openIssues += repo.open_issues_count || 0;
         stats.openPRs += repo.open_prs_count || 0;
-
         if (repo.language) {
             langCount[repo.language] = (langCount[repo.language] || 0) + 1;
         }
     }
 
-    // Top language & languages count
     const sortedLangs = Object.entries(langCount).sort((a, b) => b[1] - a[1]);
     if (sortedLangs.length > 0) {
         stats.topLanguage = sortedLangs[0][0];
         stats.languagesCount = sortedLangs.length;
     }
 
-    // Ambil data organisasi (REST)
     const headers = GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {};
     try {
         const orgRes = await fetch(`${GITHUB_API_BASE}/orgs/${org}`, { headers });
@@ -167,7 +156,6 @@ export async function fetchOrgStats(org, repos) {
         console.error('[FETCHER] Failed to fetch organization metadata:', e.message);
     }
 
-    // Total commits seluruh repositori (akurat, tanpa sampling)
     try {
         console.log(`[FETCHER] Fetching commit counts for ${repos.length} repos...`);
         const commitCounts = await fetchAllReposCommitCounts(repos);
@@ -178,10 +166,14 @@ export async function fetchOrgStats(org, repos) {
         stats.totalCommits = 0;
     }
 
-    // Hitung rank
     stats.rank = calculateRank(stats);
 
-    // Simpan cache hanya untuk full fetch (tanpa exclude/repos argumen)
+    // Ambil avatar base64 dan simpan di stats
+    if (stats.avatarUrl) {
+        stats.avatarBase64 = await fetchAvatarAsBase64(stats.avatarUrl);
+    }
+
+    // Simpan cache hanya untuk full fetch
     if (!statsCache.has(org)) {
         statsCache.set(org, {
             data: stats,
