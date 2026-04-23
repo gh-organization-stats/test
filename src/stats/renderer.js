@@ -1,4 +1,3 @@
-// src/stats/renderer.js
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
@@ -101,17 +100,33 @@ export function renderStatsCard(stats, options = {}) {
 
   const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
-  // Lebar konten: judul atau (label + spasi + nilai)
+  
+  // Hitung lebar konten minimal (tanpa rank)
   const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + 10);
+  
+  // Hitung lebar kartu dengan mempertimbangkan rank circle
   let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 20);
   let width = Math.max(cardWidthOpt || 0, contentW + 2 * PADDING + rankSpace, 300);
 
+  // Jika rank ditampilkan, pastikan posisinya tidak bertabrakan dan lebar cukup
+  let rankCircleX = 0, rankCircleY = 0;
   if (!hideRank && stats.rank) {
-    const minRankX = PADDING + maxLabelW + maxValueW + iconSpace + 40 + RANK_RADIUS + PADDING;
-    if (minRankX > width) {
-      width = minRankX;
-      rankSpace = minRankX - (contentW + 2 * PADDING); // update rankSpace
+    const statsAreaHeight = statItems.length * LINE_HEIGHT;
+    rankCircleY = statsAreaHeight / 2;
+    
+    // Hitung ulang width jika rank circle terdorong ke kanan oleh teks panjang
+    const minX = PADDING + maxLabelW + maxValueW + iconSpace + 40; // posisi aman minimum
+    const defaultX = width - PADDING - 20 - RANK_RADIUS; // default di kanan
+    let desiredX = Math.max(defaultX, minX);
+    
+    // Pastikan kartu cukup lebar
+    const requiredWidth = desiredX + RANK_RADIUS + PADDING;
+    if (requiredWidth > width) {
+      width = requiredWidth;
+      rankSpace = requiredWidth - (contentW + 2 * PADDING); // update rankSpace
+      desiredX = Math.max(width - PADDING - 20 - RANK_RADIUS, minX);
     }
+    rankCircleX = desiredX;
   }
 
   const titleLines = wrapText(customTitle, width - 2 * PADDING - rankSpace, TITLE_FONT_SIZE);
@@ -161,22 +176,14 @@ export function renderStatsCard(stats, options = {}) {
   svg.push(`<g data-testid="main-card-body" transform="translate(0, ${CARD_BODY_Y})">`);
 
   // Rank circle
-  let rankCircleX = 0, rankCircleY = 0;
-if (!hideRank && stats.rank) {
-    const statsAreaHeight = statItems.length * LINE_HEIGHT;
-    const rankCircleY = statsAreaHeight / 2;
-    const rightOffset = 20;
-    const defaultX = width - PADDING - rightOffset - RANK_RADIUS;
-    const minX = PADDING + maxLabelW + maxValueW + iconSpace + 40;
-    const rankCircleX = Math.max(defaultX, minX);
-
+  if (!hideRank && stats.rank) {
     svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
-  svg.push(`<circle class="rank-circle-rim" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
-  svg.push(`<circle class="rank-circle" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
-  svg.push(`<g class="rank-text">`);
-  svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
-  svg.push(`</g></g>`);
-}
+    svg.push(`<circle class="rank-circle-rim" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
+    svg.push(`<circle class="rank-circle" cx="-10" cy="8" r="${RANK_RADIUS}" />`);
+    svg.push(`<g class="rank-text">`);
+    svg.push(`<text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text>`);
+    svg.push(`</g></g>`);
+  }
 
   // Metrik
   svg.push(`<svg x="0" y="0">`);
