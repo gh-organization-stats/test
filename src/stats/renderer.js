@@ -47,9 +47,6 @@ const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
-/**
- * Proses ulang avatar dari base64 dengan sharp (resize & kualitas).
- */
 async function processAvatarFromBase64(base64Data, size, quality) {
   try {
     const matches = base64Data.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
@@ -207,34 +204,56 @@ export async function renderStatsCard(stats, options = {}) {
     svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
     svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
 
-    // Lingkaran progress dengan variasi desain
-    const progressCircle = (() => {
-      if (ringDesign === 'gradient') {
-        const gradId = `ringGradient-${Date.now()}`;
+    // Progress circle berdasarkan ringDesign
+    const animStyle = disableAnimations ? '' : 'style="animation: rankAnimation 1s forwards ease-in-out"';
+    const transformAttr = `transform="rotate(-90 ${cx} ${cy})"`;
+    const commonAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-width="${RANK_STROKE}" stroke-linecap="round" class="rank-circle"`;
+
+    switch (ringDesign) {
+      case 'dash': {
+        const dashLen = (circ / 24) - 2; // 24 segmen
+        svg.push(`<circle ${commonAttrs} style="stroke-dasharray: ${dashLen} 4;" stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
+        break;
+      }
+      case 'dotted': {
+        svg.push(`<circle ${commonAttrs} style="stroke-dasharray: 2 8;" stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
+        break;
+      }
+      case 'zigzag': {
+        // Ilusi zigzag dengan dash pendek dan gap sedang
+        svg.push(`<circle ${commonAttrs} style="stroke-dasharray: 4 8;" stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
+        break;
+      }
+      case 'gradient': {
+        const gradId = `ringGrad-${Date.now()}`;
         svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
         svg.push(`<stop offset="0%" stop-color="#${ringColor}" />`);
         svg.push(`<stop offset="100%" stop-color="#${textColor}" />`);
         svg.push(`</linearGradient></defs>`);
-        return `<circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke="url(#${gradId})" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : circ}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})" style="animation: ${disableAnimations ? 'none' : 'rankAnimation 1s forwards ease-in-out'}; transform-origin: ${cx}px ${cy}px;" />`;
-      } else if (ringDesign === 'double') {
-        // Lingkaran utama
-        let mainCircle = `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`;
-        // Lingkaran dalam
-        let innerCircle = `<circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS - 5}" fill="none" stroke="#${ringColor}" stroke-width="3" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : circ}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})" class="rank-circle" style="animation: rankAnimation 1s forwards ease-in-out;" />`;
-        svg.push(innerCircle); // inner dulu agar di bawah
-        return mainCircle;
-      } else if (ringDesign === 'dashed') {
-        return `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" style="stroke-dasharray: 15 10;" />`;
-      } else if (ringDesign === 'dotted') {
-        return `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" style="stroke-dasharray: 3 7; stroke-linecap: round;" />`;
-      } else if (ringDesign === 'thick') {
-        return `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" style="stroke-width: 10;" />`;
-      } else { // default
-        return `<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`;
+        svg.push(`<circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke="url(#${gradId})" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" stroke-linecap="round" ${transformAttr} ${animStyle} />`);
+        break;
       }
-    })();
-
-    svg.push(progressCircle);
+      case 'streak': {
+        // Lingkaran progres
+        svg.push(`<circle ${commonAttrs} stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
+        // Ikon api di ujung progres
+        const angleDeg = -90 + ((stats.rank.percentile || 0) / 100) * 360;
+        const rad = (angleDeg * Math.PI) / 180;
+        const flameX = cx + RANK_RADIUS * Math.cos(rad);
+        const flameY = cy + RANK_RADIUS * Math.sin(rad);
+        const flamePath = octiconPaths['flame'];
+        if (flamePath) {
+          svg.push(`<g transform="translate(${flameX - 8}, ${flameY - 8})">`);
+          svg.push(`<svg viewBox="0 0 16 16" width="16" height="16" fill="#${ringColor}"><path d="${flamePath}"/></svg>`);
+          svg.push(`</g>`);
+        }
+        break;
+      }
+      default: { // default solid
+        svg.push(`<circle ${commonAttrs} stroke="#${ringColor}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} ${animStyle} />`);
+        break;
+      }
+    }
 
     // Konten rank
     if (rankIcon === 'avatar') {
