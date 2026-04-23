@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     if (!org) throw new Error('Parameter "org" is required');
 
     let resize = parseInt(photo_resize);
-    if (isNaN(resize) || resize < 10) resize = 80;
+    if (isNaN(resize) || resize < 10) resize = 150;
     else if (resize > 250) resize = 250;
 
     let quality = parseInt(photo_quality);
