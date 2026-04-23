@@ -16,6 +16,7 @@ const ICON_SIZE = 16;
 const ICON_SPACING = 9;
 const RIGHT_MARGIN = 20;
 const EXTRA_WIDTH = 40;
+const LABEL_VALUE_GAP = 20;
 
 // Fungsi pembersih warna
 function cleanColor(c) {
@@ -247,7 +248,7 @@ export async function renderStatsCard(stats, options = {}) {
     }
     
     const labelX = showIcons ? ICON_SIZE + ICON_SPACING : 0;
-    const valueX = labelX + maxLabelW + 10;
+    const valueX = labelX + maxLabelW + LABEL_VALUE_GAP;
     
     svg.push(`<text class="stat bold" x="${labelX}" y="12.5">${escapeXml(item.label)}</text>`);
     svg.push(`<text class="stat bold" x="${valueX}" y="12.5" data-testid="${item.key}">${escapeXml(item.value)}</text>`);
