@@ -1,4 +1,3 @@
-// src/stats/renderer.js
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
@@ -48,7 +47,6 @@ const CORE_METRICS = new Set([
   'totalStars', 'totalForks', 'totalCommits', 'openPRs', 'openIssues', 'publicRepos', 'totalSize'
 ]);
 
-// Fungsi fetch avatar (sebagai fallback jika tidak ada di cache)
 async function fetchImageAsBase64(url) {
   try {
     const response = await fetch(url);
@@ -124,7 +122,7 @@ export async function renderStatsCard(stats, options = {}) {
     }
   }
 
-  // Hitung lebar teks
+  // Hitung lebar teks metrik
   let maxLabelW = 0, maxValueW = 0;
   statItems.forEach(item => {
     const lw = measureTextWidth(item.label, METRIC_FONT_SIZE);
@@ -136,13 +134,17 @@ export async function renderStatsCard(stats, options = {}) {
   const iconSpace = showIcons ? (ICON_SIZE + ICON_SPACING) : 0;
   const titleW = measureTextWidth(customTitle, TITLE_FONT_SIZE);
   
-  const contentW = Math.max(titleW, maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP);
+  // Lebar konten metrik saja (tanpa judul)
+  const metricsContentW = maxLabelW + maxValueW + iconSpace + LABEL_VALUE_GAP;
   
+  // Ruang untuk rank circle
   let rankSpace = hideRank ? 0 : (RANK_RADIUS * 2 + 30);
   
+  // Lebar kartu minimal
   let width = Math.max(
     cardWidthOpt || 0,
-    contentW + 2 * PADDING + rankSpace + EXTRA_WIDTH,
+    metricsContentW + 2 * PADDING + rankSpace + EXTRA_WIDTH, // cukup untuk metrik + rank
+    titleW + 2 * PADDING, // cukup untuk judul (rank tidak perlu dipertimbangkan untuk judul)
     350
   );
 
@@ -152,22 +154,25 @@ export async function renderStatsCard(stats, options = {}) {
     const statsAreaHeight = statItems.length * LINE_HEIGHT;
     rankCircleY = (statsAreaHeight / 2) - 15;
 
+    // Posisi X rank circle mengikuti ujung kanan metrik, bukan judul
     const leftContentRight = PADDING + iconSpace + maxLabelW + maxValueW;
     const minX = leftContentRight + 70;
-    const defaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
-    let desiredX = Math.max(defaultX, minX);
-
-    const requiredWidth = desiredX + RANK_RADIUS + PADDING + RIGHT_MARGIN;
-    if (requiredWidth > width) {
-      width = requiredWidth + EXTRA_WIDTH;
-      const newDefaultX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
-      desiredX = Math.max(newDefaultX, minX);
-      rankSpace = width - (contentW + 2 * PADDING);
+    const maxX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
+    let desiredX = Math.min(minX, maxX);
+    
+    // Jika area metrik terlalu lebar hingga melebihi maxX, perlebar kartu
+    if (minX > maxX) {
+      width = minX + RANK_RADIUS + PADDING + RIGHT_MARGIN + EXTRA_WIDTH;
+      // Hitung ulang maxX dengan width baru
+      const newMaxX = width - PADDING - RIGHT_MARGIN - RANK_RADIUS;
+      desiredX = Math.min(minX, newMaxX);
+      rankSpace = width - (metricsContentW + 2 * PADDING);
     }
     rankCircleX = desiredX;
   }
 
-  const titleLines = wrapText(customTitle, width - 2 * PADDING - rankSpace, TITLE_FONT_SIZE);
+  // Judul tidak perlu dipangkas oleh rankSpace
+  const titleLines = wrapText(customTitle, width - 2 * PADDING, TITLE_FONT_SIZE);
   const titleHeight = titleLines.length * (TITLE_FONT_SIZE + 4);
   const height = CARD_BODY_Y + statItems.length * LINE_HEIGHT + PADDING;
 
@@ -226,7 +231,6 @@ export async function renderStatsCard(stats, options = {}) {
     svg.push(`<circle class="rank-circle" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
 
     if (rankIcon === 'avatar') {
-      // Gunakan avatarBase64 dari cache jika tersedia, jika tidak fetch ulang
       let avatarData = stats.avatarBase64;
       if (!avatarData && stats.avatarUrl) {
         avatarData = await fetchImageAsBase64(stats.avatarUrl);
