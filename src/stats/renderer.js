@@ -78,7 +78,7 @@ export async function renderStatsCard(stats, options = {}) {
   const allBold = options.all_bold === 'true';
   const photoResize = options.photo_resize || 80;
   const photoQuality = options.photo_quality || 90;
-  const ringDesign = options.ring_design || 'default';
+  const ringDesign = options.ring_design || 'default'; // 'default', 'gradient', 'transparent-tip'
 
   const fontFamily = "'Segoe UI', Ubuntu, Sans-Serif";
 
@@ -200,16 +200,14 @@ export async function renderStatsCard(stats, options = {}) {
 
     svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
 
-    // Lingkaran latar (kecuali dash)
-    if (ringDesign !== 'dash') {
+    // Lingkaran latar (rim) hanya untuk 'default' dan 'gradient'
+    if (ringDesign === 'default' || ringDesign === 'gradient') {
       svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
     }
 
-    // Siapkan lingkaran progres
     let progressAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="round"`;
     let strokeValue = `#${ringColor}`;
-    let inlineStyle = '';
-    let useRankCircleClass = true;
+    let useClass = true;
 
     if (ringDesign === 'gradient') {
       const gradId = `ringGrad-${Date.now()}`;
@@ -218,31 +216,35 @@ export async function renderStatsCard(stats, options = {}) {
       svg.push(`<stop offset="100%" stop-color="#${textColor}" />`);
       svg.push(`</linearGradient></defs>`);
       strokeValue = `url(#${gradId})`;
-      useRankCircleClass = false;
-    } else if (ringDesign === 'dash') {
-      progressAttrs += ` stroke-width="5"`; // lebih tebal agar terlihat tinggi
-      inlineStyle = `stroke-dasharray: 16 4; stroke-linecap: round;`; // garis 8px, celah 4px
+      useClass = false;
+    } else if (ringDesign === 'transparent-tip') {
+      const gradId = `transTip-${Date.now()}`;
+      svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
+      svg.push(`<stop offset="0%" stop-color="#${ringColor}" stop-opacity="1" />`);
+      svg.push(`<stop offset="100%" stop-color="#${ringColor}" stop-opacity="0" />`);
+      svg.push(`</linearGradient></defs>`);
+      strokeValue = `url(#${gradId})`;
+      useClass = false;
     }
 
     // Animasi
-    if (!disableAnimations) {
-      inlineStyle += ` animation: rankAnimation 1s forwards ease-in-out;`;
-    }
+    const animInline = disableAnimations ? '' : ` animation: rankAnimation 1s forwards ease-in-out;`;
 
-    if (useRankCircleClass) {
+    if (!useClass) {
+      // Gradient / transparent-tip: tulis inline
+      progressAttrs += ` stroke="${strokeValue}" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr}`;
+      if (disableAnimations) {
+        svg.push(`<circle ${progressAttrs} />`);
+      } else {
+        svg.push(`<circle ${progressAttrs} style="${animInline}" />`);
+      }
+    } else {
+      // Default
       progressAttrs += ` class="rank-circle" stroke="${strokeValue}"`;
-      if (inlineStyle) {
-        progressAttrs += ` style="${inlineStyle}"`;
+      if (disableAnimations) {
+        progressAttrs += ` stroke-dashoffset="${target}" style="animation: none;"`;
       }
       svg.push(`<circle ${progressAttrs} stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} />`);
-    } else {
-      // Gradient: tulis inline tanpa kelas
-      progressAttrs += ` stroke="${strokeValue}" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr}`;
-      if (!disableAnimations) {
-        svg.push(`<circle ${progressAttrs} style="animation: rankAnimation 1s forwards ease-in-out;" />`);
-      } else {
-        svg.push(`<circle ${progressAttrs} />`);
-      }
     }
 
     // Konten rank (avatar, github, percent, default)
