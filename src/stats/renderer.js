@@ -375,8 +375,6 @@ function escapeXml(unsafe) {
   return unsafe.replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '\'': '&apos;', '"': '&quot;' })[c]);
 }
 
-// src/stats/renderer.js (tambahan di bawah)
-
 export function renderErrorCard(message, options = {}) {
   const theme = themes[options.theme] || themes.default;
   const defaultTheme = themes.default;
@@ -398,7 +396,6 @@ export function renderErrorCard(message, options = {}) {
   const borderRadius = options.border_radius || '4.5';
   const hideBorder = options.hide_border === 'true';
 
-  // Gradient background jika diperlukan
   let isGradient = false, gradientId = null, gradientAngle = 0, gradientStops = [];
   if (typeof rawBgColor === 'string' && rawBgColor.includes(',')) {
     isGradient = true;
@@ -409,19 +406,20 @@ export function renderErrorCard(message, options = {}) {
   }
   const bgColor = cleanColor(rawBgColor);
 
-  // Teks error yang mungkin panjang, akan di-wrap
   const errorTitle = i18n.error || 'Error';
   const errorMessage = message || 'Unknown error';
 
-  // Estimasi lebar minimal 400px, tinggi dihitung dari teks
+  // Lebar minimum 400px, tinggi dinamis
   const minWidth = 400;
-  const maxMsgWidth = 320; // area teks setelah padding
-  const wrappedLines = wrapText(errorMessage, maxMsgWidth, METRIC_FONT_SIZE);
-  const lineHeight = 20;
-  const titleHeight = 22;
+  const titleWidth = measureTextWidth(errorTitle, TITLE_FONT_SIZE);
+  const cardWidth = Math.max(minWidth, titleWidth + 2 * PADDING);
+  const textAreaWidth = cardWidth - 2 * PADDING; // teks menggunakan seluruh lebar tersedia
+
+  const wrappedLines = wrapText(errorMessage, textAreaWidth, METRIC_FONT_SIZE);
+  const lineHeight = 22;
+  const titleBlockHeight = TITLE_FONT_SIZE + 8;
   const textBlockHeight = wrappedLines.length * lineHeight;
-  const cardHeight = PADDING * 2 + titleHeight + 10 + textBlockHeight + PADDING;
-  const cardWidth = Math.max(minWidth, measureTextWidth(errorTitle, TITLE_FONT_SIZE) + 2 * PADDING);
+  const cardHeight = PADDING + titleBlockHeight + 10 + textBlockHeight + PADDING;
 
   const svg = [];
   svg.push(`<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Error Card">`);
@@ -445,8 +443,8 @@ export function renderErrorCard(message, options = {}) {
   // Judul error
   svg.push(`<text x="${PADDING}" y="${PADDING + TITLE_FONT_SIZE}" class="header">${escapeXml(errorTitle)}</text>`);
 
-  // Pesan error (wrap vertikal)
-  let y = PADDING + TITLE_FONT_SIZE + 10;
+  // Pesan error
+  let y = PADDING + titleBlockHeight + 10;
   wrappedLines.forEach(line => {
     svg.push(`<text x="${PADDING}" y="${y + METRIC_FONT_SIZE}" class="error-text">${escapeXml(line)}</text>`);
     y += lineHeight;

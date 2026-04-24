@@ -31,7 +31,7 @@ export function formatSize(sizeKB) {
 }
 
 /**
- * Memecah teks menjadi beberapa baris.
+ * Memecah teks menjadi beberapa baris tanpa menyisakan ruang kosong berlebih.
  */
 export function wrapText(text, maxWidth, fontSize) {
   const words = String(text).split(' ');
@@ -40,14 +40,16 @@ export function wrapText(text, maxWidth, fontSize) {
 
   for (const word of words) {
     const testLine = currentLine ? `${currentLine} ${word}` : word;
-    if (measureTextWidth(testLine, fontSize) <= maxWidth) {
+    const testWidth = measureTextWidth(testLine, fontSize);
+
+    if (testWidth <= maxWidth) {
       currentLine = testLine;
     } else {
       if (currentLine) {
         lines.push(currentLine);
         currentLine = '';
       }
-      // Jika satu kata lebih panjang dari maxWidth, potong paksa
+      // Jika satu kata lebih panjang dari maxWidth, potong paksa dengan tanda hubung
       if (measureTextWidth(word, fontSize) > maxWidth) {
         let remaining = word;
         while (remaining.length > 0) {
