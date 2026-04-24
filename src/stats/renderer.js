@@ -409,22 +409,37 @@ export function renderErrorCard(message, options = {}) {
   const errorTitle = i18n.error || 'Error';
   const errorMessage = message || 'Unknown error';
 
-  // Lebar minimum 400px, tinggi dinamis
+  // Tinggi default mengacu pada stats card
+  const defaultHeight = 255;
+  const titleHeight = TITLE_FONT_SIZE + 8; // tinggi area judul
+  const bodyStartY = PADDING + titleHeight + 10; // Y setelah judul
+  const bottomPadding = PADDING;
+  const availableHeightForText = defaultHeight - bodyStartY - bottomPadding;
+
+  // Lebar kartu
   const minWidth = 400;
   const titleWidth = measureTextWidth(errorTitle, TITLE_FONT_SIZE);
   const cardWidth = Math.max(minWidth, titleWidth + 2 * PADDING);
-  const textAreaWidth = cardWidth - PADDING; // teks menggunakan seluruh lebar tersedia
+  const textAreaWidth = cardWidth - PADDING;
 
   const wrappedLines = wrapText(errorMessage, textAreaWidth, METRIC_FONT_SIZE);
   const lineHeight = 22;
-  const titleBlockHeight = TITLE_FONT_SIZE + 8;
   const textBlockHeight = wrappedLines.length * lineHeight;
-  const cardHeight = PADDING + titleBlockHeight + 10 + textBlockHeight + PADDING;
+
+  // Jika teks melebihi ruang default, tambah tinggi kartu
+  let cardHeight = defaultHeight;
+  if (textBlockHeight > availableHeightForText) {
+    cardHeight = bodyStartY + textBlockHeight + bottomPadding;
+  }
+
+  // Posisi Y awal teks: tengah vertikal di area yang tersedia
+  const totalTextAreaHeight = cardHeight - bodyStartY - bottomPadding;
+  const startTextY = bodyStartY + (totalTextAreaHeight - textBlockHeight) / 2;
 
   const svg = [];
   svg.push(`<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Error Card">`);
   svg.push(`<style>`);
-  svg.push(`.header { font: 600 18px ${fontFamily}; fill: #${titleColor}; }`);
+  svg.push(`.header { font: 600 18px ${fontFamily}; fill: #${titleColor}; text-anchor: middle; }`);
   svg.push(`.error-text { font: 400 14px ${fontFamily}; fill: #${textColor}; }`);
   svg.push(`</style>`);
 
@@ -441,10 +456,10 @@ export function renderErrorCard(message, options = {}) {
   svg.push(`<rect x="0.5" y="0.5" rx="${borderRadius}" width="${cardWidth - 1}" height="${cardHeight - 1}" fill="${bgFill}" stroke="#${borderColor}" stroke-width="2" stroke-opacity="${hideBorder ? '0' : '1'}" />`);
 
   // Judul error
-  svg.push(`<text x="${PADDING}" y="${PADDING + TITLE_FONT_SIZE}" class="header">${escapeXml(errorTitle)}</text>`);
+  svg.push(`<text x="50%" y="${PADDING + TITLE_FONT_SIZE}" class="header" text-anchor="middle">${escapeXml(errorTitle)}</text>`);
 
   // Pesan error
-  let y = PADDING + titleBlockHeight + 10;
+  let y = startTextY;
   wrappedLines.forEach(line => {
     svg.push(`<text x="${PADDING}" y="${y + METRIC_FONT_SIZE}" class="error-text">${escapeXml(line)}</text>`);
     y += lineHeight;
