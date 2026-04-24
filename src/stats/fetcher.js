@@ -19,27 +19,26 @@ function log_normal_cdf(x) {
 }
 
 function calculateRank(stats) {
+    // Hanya metrik yang dipilih
     const TOTAL_STARS_MEDIAN = 500;
-    const TOTAL_FORKS_MEDIAN = 200;
+    const TOTAL_REPOS_MEDIAN = 10;
     const TOTAL_COMMITS_MEDIAN = 5000;
-    const OPEN_PRS_MEDIAN = 100;
-    const PUBLIC_REPOS_MEDIAN = 10;
-    const MEMBERS_MEDIAN = 5;
+    const TOTAL_FORKS_MEDIAN = 200;
+    const TOTAL_FOLLOWERS_MEDIAN = 50;
 
-    const TOTAL_STARS_WEIGHT = 4;
+    // Bobot baru
+    const TOTAL_STARS_WEIGHT = 5;
+    const TOTAL_REPOS_WEIGHT = 2;
+    const TOTAL_COMMITS_WEIGHT = 3;
     const TOTAL_FORKS_WEIGHT = 3;
-    const TOTAL_COMMITS_WEIGHT = 2;
-    const OPEN_PRS_WEIGHT = 1;
-    const PUBLIC_REPOS_WEIGHT = 1;
-    const MEMBERS_WEIGHT = 1;
+    const TOTAL_FOLLOWERS_WEIGHT = 1;
 
     const TOTAL_WEIGHT =
         TOTAL_STARS_WEIGHT +
-        TOTAL_FORKS_WEIGHT +
+        TOTAL_REPOS_WEIGHT +
         TOTAL_COMMITS_WEIGHT +
-        OPEN_PRS_WEIGHT +
-        PUBLIC_REPOS_WEIGHT +
-        MEMBERS_WEIGHT;
+        TOTAL_FORKS_WEIGHT +
+        TOTAL_FOLLOWERS_WEIGHT;
 
     const THRESHOLDS = [1, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
     const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
@@ -47,11 +46,10 @@ function calculateRank(stats) {
     const rank =
         1 -
         (TOTAL_STARS_WEIGHT * log_normal_cdf(stats.totalStars / TOTAL_STARS_MEDIAN) +
-            TOTAL_FORKS_WEIGHT * log_normal_cdf(stats.totalForks / TOTAL_FORKS_MEDIAN) +
+            TOTAL_REPOS_WEIGHT * log_normal_cdf(stats.publicRepos / TOTAL_REPOS_MEDIAN) +
             TOTAL_COMMITS_WEIGHT * exponential_cdf(stats.totalCommits / TOTAL_COMMITS_MEDIAN) +
-            OPEN_PRS_WEIGHT * exponential_cdf(stats.openPRs / OPEN_PRS_MEDIAN) +
-            PUBLIC_REPOS_WEIGHT * log_normal_cdf(stats.publicRepos / PUBLIC_REPOS_MEDIAN) +
-            MEMBERS_WEIGHT * log_normal_cdf(stats.members / MEMBERS_MEDIAN)) /
+            TOTAL_FORKS_WEIGHT * log_normal_cdf(stats.totalForks / TOTAL_FORKS_MEDIAN) +
+            TOTAL_FOLLOWERS_WEIGHT * log_normal_cdf(stats.followers / TOTAL_FOLLOWERS_MEDIAN)) /
         TOTAL_WEIGHT;
 
     const percentile = formatPercentile(rank * 100);
