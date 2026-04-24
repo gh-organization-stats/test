@@ -440,7 +440,7 @@ export function renderErrorCard(message, options = {}) {
   svg.push(`<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Error Card">`);
   svg.push(`<style>`);
   svg.push(`.header { font: 600 18px ${fontFamily}; fill: #${titleColor}; text-anchor: middle; }`);
-  svg.push(`.error-text { font: 400 14px ${fontFamily}; fill: #${textColor}; }`);
+  svg.push(`.error-text { font: 400 14px ${fontFamily}; fill: #${textColor}; text-anchor: middle; }`);
   svg.push(`</style>`);
 
   const bgFill = isGradient ? `url(#${gradientId})` : `#${bgColor}`;
@@ -461,7 +461,7 @@ export function renderErrorCard(message, options = {}) {
   // Pesan error
   let y = startTextY;
   wrappedLines.forEach(line => {
-    svg.push(`<text x="${PADDING}" y="${y + METRIC_FONT_SIZE}" class="error-text">${escapeXml(line)}</text>`);
+    svg.push(`<text x="50%" y="${y + METRIC_FONT_SIZE}" class="error-text" text-anchor="middle">${escapeXml(line)}</text>`);
     y += lineHeight;
   });
 
