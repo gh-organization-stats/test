@@ -465,12 +465,12 @@ export function renderErrorCard(message, options = {}) {
   svg.push(`</g>`);
 
   // Judul error
-  svg.push(`<text x="50%" y="${titleY}" class="header" text-anchor="middle">${escapeXml(errorTitle)}</text>`);
+  svg.push(`<text x="50%" y="${titleY - 4}" class="header" text-anchor="middle">${escapeXml(errorTitle)}</text>`);
 
   // Pesan error
   let y = startTextY;
   wrappedLines.forEach(line => {
-    svg.push(`<text x="50%" y="${y + METRIC_FONT_SIZE}" class="error-text" text-anchor="middle">${escapeXml(line)}</text>`);
+    svg.push(`<text x="50%" y="${y + METRIC_FONT_SIZE - 4}" class="error-text" text-anchor="middle">${escapeXml(line)}</text>`);
     y += lineHeight;
   });
 
