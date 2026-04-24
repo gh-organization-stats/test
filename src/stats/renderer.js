@@ -1,4 +1,3 @@
-// src/stats/renderer.js
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
@@ -213,8 +212,10 @@ export async function renderStatsCard(stats, options = {}) {
 
     svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
 
-    // Lingkaran latar (rim) selalu ada
-    svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
+    // Lingkaran latar (rim) hanya jika bukan gradient
+    if (!ringIsGradient) {
+      svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
+    }
 
     // Siapkan lingkaran progres
     let progressAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="round"`;
@@ -223,7 +224,7 @@ export async function renderStatsCard(stats, options = {}) {
 
     if (ringIsGradient) {
       const gradId = `ringGrad-${Date.now()}`;
-      svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
+      svg.push(`<defs><linearGradient id="${gradId}" gradientTransform="rotate(${ringGradientAngle})">`);
       ringGradientStops.forEach((c, i) => {
         const offset = (i / (ringGradientStops.length - 1)) * 100;
         svg.push(`<stop offset="${offset}%" stop-color="#${c}"/>`);
@@ -250,7 +251,7 @@ export async function renderStatsCard(stats, options = {}) {
       svg.push(`<circle ${progressAttrs} stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr} />`);
     }
 
-    // Konten rank (avatar, github, percent, default)
+    // Konten rank (avatar, github, progress, default)
     if (rankIcon === 'avatar') {
       let avatarData = stats.avatarBase64;
       if (!avatarData && stats.avatarUrl) {
