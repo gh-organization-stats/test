@@ -194,7 +194,7 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
   svg.push(`.rank-circle-rim { stroke: #${ringColor}; fill: none; stroke-width: ${RANK_STROKE}; opacity: 0.2; }`);
   svg.push(`.rank-circle { stroke: #${ringColor}; stroke-dasharray: 250; fill: none; stroke-width: ${RANK_STROKE}; stroke-linecap: round; opacity: 0.8; transform-origin: -10px 8px; transform: rotate(-90deg); animation: rankAnimation 1s forwards ease-in-out; }`);
-  svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: 251.32741228718345; } to { stroke-dashoffset: ${251.32741228718345 * (1 - (stats.rank?.percentile || 0) / 100)}; } }`);
+  svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: 251.32741228718345; } to { stroke-dashoffset: ${251.32741228718345 * (stats.rank?.percentile || 0) / 100}; } }`);
   svg.push(`@keyframes scaleInAnimation { from { transform: translate(-5px, 5px) scale(0); } to { transform: translate(-5px, 5px) scale(1); } }`);
   svg.push(`@keyframes fadeInAnimation { from { opacity: 0; } to { opacity: 1; } }`);
   svg.push(`</style>`);
@@ -220,7 +220,7 @@ export async function renderStatsCard(stats, options = {}) {
     const cx = -10;
     const cy = 8;
     const circ = 2 * Math.PI * RANK_RADIUS;
-    const target = ((100 - (stats.rank?.percentile || 0)) / 100) * circ;
+    const target = ((stats.rank?.percentile || 0) / 100) * circ;
     const transformAttr = `transform="rotate(-90 ${cx} ${cy})"`;
 
     svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
