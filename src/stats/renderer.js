@@ -409,32 +409,22 @@ export function renderErrorCard(message, options = {}) {
   const errorTitle = i18n.error || 'Error';
   const errorMessage = message || 'Unknown error';
 
-  // Tinggi default mengacu pada stats card
-  const defaultHeight = 255;
-  const titleHeight = TITLE_FONT_SIZE + 8; // tinggi area judul
-  const bodyStartY = PADDING + titleHeight + 10; // Y setelah judul
-  const bottomPadding = PADDING;
-  const availableHeightForText = defaultHeight - bodyStartY - bottomPadding;
-
-  // Lebar kartu
-  const minWidth = 400;
+  // Lebar kartu minimal 400px, disesuaikan dengan lebar judul
   const titleWidth = measureTextWidth(errorTitle, TITLE_FONT_SIZE);
-  const cardWidth = Math.max(minWidth, titleWidth + 2 * PADDING);
-  const textAreaWidth = cardWidth - PADDING;
+  const cardWidth = Math.max(400, titleWidth + 2 * PADDING);
+  const textAreaWidth = cardWidth - PADDING; // area teks tidak diubah
 
+  // Wrap teks
   const wrappedLines = wrapText(errorMessage, textAreaWidth, METRIC_FONT_SIZE);
   const lineHeight = 22;
-  const textBlockHeight = wrappedLines.length * lineHeight;
 
-  // Jika teks melebihi ruang default, tambah tinggi kartu
-  let cardHeight = defaultHeight;
-  if (textBlockHeight > availableHeightForText) {
-    cardHeight = bodyStartY + textBlockHeight + bottomPadding;
-  }
+  // Tinggi judul + jarak
+  const titleBlockHeight = TITLE_FONT_SIZE + 8;
+  // Tinggi total card
+  const cardHeight = PADDING + titleBlockHeight + 10 + (wrappedLines.length * lineHeight) + PADDING;
 
-  // Posisi Y awal teks: tengah vertikal di area yang tersedia
-  const totalTextAreaHeight = cardHeight - bodyStartY - bottomPadding;
-  const startTextY = bodyStartY + (totalTextAreaHeight - textBlockHeight) / 2;
+  // Posisi Y teks mulai setelah judul
+  const startTextY = PADDING + titleBlockHeight + 10;
 
   const svg = [];
   svg.push(`<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Error Card">`);
@@ -455,10 +445,10 @@ export function renderErrorCard(message, options = {}) {
 
   svg.push(`<rect x="0.5" y="0.5" rx="${borderRadius}" width="${cardWidth - 1}" height="${cardHeight - 1}" fill="${bgFill}" stroke="#${borderColor}" stroke-width="2" stroke-opacity="${hideBorder ? '0' : '1'}" />`);
 
-  // Judul error
+  // Judul error (tengah horizontal)
   svg.push(`<text x="50%" y="${PADDING + TITLE_FONT_SIZE}" class="header" text-anchor="middle">${escapeXml(errorTitle)}</text>`);
 
-  // Pesan error
+  // Pesan error (tengah horizontal, dimulai dari startTextY)
   let y = startTextY;
   wrappedLines.forEach(line => {
     svg.push(`<text x="50%" y="${y + METRIC_FONT_SIZE}" class="error-text" text-anchor="middle">${escapeXml(line)}</text>`);
