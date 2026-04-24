@@ -179,6 +179,7 @@ export async function renderStatsCard(stats, options = {}) {
   svg.push(`.stagger { opacity: 0; animation: fadeInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.rank-text { font: 800 24px ${fontFamily}; fill: #${textColor}; animation: scaleInAnimation 0.3s ease-in-out forwards; }`);
   svg.push(`.icon { fill: #${iconColor}; display: ${showIcons ? 'block' : 'none'}; }`);
+  // Kelas rank-circle-rim hanya digunakan untuk solid, jika tidak ada gradient kita biarkan seperti semula
   svg.push(`.rank-circle-rim { stroke: #${ringColor}; fill: none; stroke-width: ${RANK_STROKE}; opacity: 0.2; }`);
   svg.push(`.rank-circle { stroke: #${ringColor}; stroke-dasharray: 250; fill: none; stroke-width: ${RANK_STROKE}; stroke-linecap: round; opacity: 0.8; transform-origin: -10px 8px; transform: rotate(-90deg); animation: rankAnimation 1s forwards ease-in-out; }`);
   svg.push(`@keyframes rankAnimation { from { stroke-dashoffset: 251.32741228718345; } to { stroke-dashoffset: ${251.32741228718345 * (1 - (stats.rank?.percentile || 0) / 100)}; } }`);
@@ -212,11 +213,6 @@ export async function renderStatsCard(stats, options = {}) {
 
     svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
 
-    // Lingkaran latar (rim) hanya jika bukan gradient
-    if (!ringIsGradient) {
-      svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
-    }
-
     // Siapkan lingkaran progres
     let progressAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="round"`;
     let strokeValue = `#${ringColor}`;
@@ -224,14 +220,32 @@ export async function renderStatsCard(stats, options = {}) {
 
     if (ringIsGradient) {
       const gradId = `ringGrad-${Date.now()}`;
+      const rimGradId = `ringRimGrad-${Date.now()}`;
+
+      // Gradient untuk progres
       svg.push(`<defs><linearGradient id="${gradId}" gradientTransform="rotate(${ringGradientAngle})">`);
       ringGradientStops.forEach((c, i) => {
         const offset = (i / (ringGradientStops.length - 1)) * 100;
         svg.push(`<stop offset="${offset}%" stop-color="#${c}"/>`);
       });
+      svg.push(`</linearGradient>`);
+
+      // Gradient untuk rim dengan opacity kecil
+      svg.push(`<linearGradient id="${rimGradId}" gradientTransform="rotate(${ringGradientAngle})">`);
+      ringGradientStops.forEach((c, i) => {
+        const offset = (i / (ringGradientStops.length - 1)) * 100;
+        svg.push(`<stop offset="${offset}%" stop-color="#${c}" stop-opacity="0.2"/>`);
+      });
       svg.push(`</linearGradient></defs>`);
+
       strokeValue = `url(#${gradId})`;
       useClass = false;
+
+      // Ring rim dengan gradient transparan
+      svg.push(`<circle cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke="url(#${rimGradId})" stroke-width="${RANK_STROKE}" />`);
+    } else {
+      // Lingkaran latar (rim) solid
+      svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
     }
 
     const animInline = disableAnimations ? '' : ` animation: rankAnimation 1s forwards ease-in-out;`;
