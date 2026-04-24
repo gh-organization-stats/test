@@ -1,3 +1,4 @@
+// src/stats/renderer.js
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
 import { octiconPaths } from './icons.js';
@@ -78,7 +79,6 @@ export async function renderStatsCard(stats, options = {}) {
   const allBold = options.all_bold === 'true';
   const photoResize = options.photo_resize || 80;
   const photoQuality = options.photo_quality || 90;
-  const ringDesign = options.ring_design || 'default'; // 'default', 'gradient', 'transparent-tip'
 
   const fontFamily = "'Segoe UI', Ubuntu, Sans-Serif";
 
@@ -86,8 +86,21 @@ export async function renderStatsCard(stats, options = {}) {
   const textColor = cleanColor(options.text_color || theme.textColor);
   const iconColor = cleanColor(options.icon_color || theme.iconColor);
   const borderColor = cleanColor(options.border_color || theme.borderColor);
-  const ringColor = cleanColor(options.ring_color || theme.ringColor);
   const rawBgColor = options.bg_color || theme.bgColor;
+  
+  // Ring color: bisa solid atau gradient (format: angle,color1,color2,...)
+  const ringColorRaw = options.ring_color || theme.ringColor;
+  let ringIsGradient = false;
+  let ringGradientAngle = 0;
+  let ringGradientStops = [];
+  let ringColor = cleanColor(ringColorRaw);
+  
+  if (typeof ringColorRaw === 'string' && ringColorRaw.includes(',')) {
+    ringIsGradient = true;
+    const parts = ringColorRaw.split(',').map(p => p.trim());
+    ringGradientAngle = parseInt(parts[0], 10) || 0;
+    ringGradientStops = parts.slice(1).map(c => cleanColor(c));
+  }
 
   let isGradient = false, gradientId = null, gradientAngle = 0, gradientStops = [];
   if (typeof rawBgColor === 'string' && rawBgColor.includes(',')) {
@@ -200,98 +213,29 @@ export async function renderStatsCard(stats, options = {}) {
 
     svg.push(`<g data-testid="rank-circle" transform="translate(${rankCircleX}, ${rankCircleY})">`);
 
-    // Lingkaran latar (rim) hanya untuk 'default' dan 'gradient'
-    if (ringDesign === 'default' || ringDesign === 'gradient') {
-      svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
-    }
+    // Lingkaran latar (rim) selalu ada
+    svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
 
-    let progressAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="${ringDesign === 'transparent-tip' ? 'butt' : 'round'}"`;
+    // Siapkan lingkaran progres
+    let progressAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="round"`;
     let strokeValue = `#${ringColor}`;
     let useClass = true;
 
-    if (ringDesign === 'gradient') {
+    if (ringIsGradient) {
       const gradId = `ringGrad-${Date.now()}`;
       svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
-      svg.push(`<stop offset="0%" stop-color="#${ringColor}" />`);
-      svg.push(`<stop offset="100%" stop-color="#${textColor}" />`);
+      ringGradientStops.forEach((c, i) => {
+        const offset = (i / (ringGradientStops.length - 1)) * 100;
+        svg.push(`<stop offset="${offset}%" stop-color="#${c}"/>`);
+      });
       svg.push(`</linearGradient></defs>`);
       strokeValue = `url(#${gradId})`;
       useClass = false;
-} else if (ringDesign === 'transparent-tip') {
-  // hitung panjang arc
-  const progress = (stats.rank?.percentile || 0) / 100;
-  const tipLen = Math.max(6, Math.min(RANK_STROKE * 1.6, circ * 0.08));
-  const tipPct = tipLen / circ;
-  const mainPct = Math.max(0, progress - tipPct);
+    }
 
-  const startAngle = -90;
-  const mainEndAngle = startAngle + mainPct * 360;
-  const tipStartAngle = mainEndAngle;
-  const tipEndAngle = startAngle + progress * 360;
-
-  const polarToCartesian = (cx, cy, r, angleDeg) => {
-    const rad = ((angleDeg - 90) * Math.PI) / 180;
-    return {
-      x: cx + r * Math.cos(rad),
-      y: cy + r * Math.sin(rad),
-    };
-  };
-
-  const describeArc = (cx, cy, r, startAngle, endAngle) => {
-    const start = polarToCartesian(cx, cy, r, startAngle);
-    const end = polarToCartesian(cx, cy, r, endAngle);
-    const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
-    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
-  };
-
-  const tipStart = polarToCartesian(cx, cy, RANK_RADIUS, tipStartAngle);
-  const tipEnd = polarToCartesian(cx, cy, RANK_RADIUS, tipEndAngle);
-
-  const gradId = `transTip-${Date.now()}`;
-  svg.push(`<defs>
-    <linearGradient id="${gradId}" gradientUnits="userSpaceOnUse"
-      x1="${tipStart.x}" y1="${tipStart.y}"
-      x2="${tipEnd.x}" y2="${tipEnd.y}">
-      <stop offset="0%" stop-color="#${ringColor}" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#${ringColor}" stop-opacity="0"/>
-    </linearGradient>
-  </defs>`);
-
-  // gambar MAIN (solid)
-  if (mainPct > 0) {
-    const mainPath = describeArc(cx, cy, RANK_RADIUS, startAngle, mainEndAngle);
-    svg.push(`<path
-      d="${mainPath}"
-      fill="none"
-      stroke="#${ringColor}"
-      stroke-width="${RANK_STROKE}"
-      stroke-linecap="butt"
-      ${transformAttr}
-    />`);
-  }
-
-  // gambar TIP (fade)
-  if (progress > 0) {
-    const tipPath = describeArc(cx, cy, RANK_RADIUS, tipStartAngle, tipEndAngle);
-    svg.push(`<path
-      d="${tipPath}"
-      fill="none"
-      stroke="url(#${gradId})"
-      stroke-width="${RANK_STROKE}"
-      stroke-linecap="butt"
-      ${transformAttr}
-    />`);
-  }
-
-  // supaya circle default tidak digambar lagi
-  useClass = false;
-}
-
-    // Animasi
     const animInline = disableAnimations ? '' : ` animation: rankAnimation 1s forwards ease-in-out;`;
 
-    if (!useClass && ringDesign !== 'transparent-tip') {
-      // Gradient / transparent-tip: tulis inline
+    if (!useClass) {
       progressAttrs += ` stroke="${strokeValue}" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr}`;
       if (disableAnimations) {
         svg.push(`<circle ${progressAttrs} />`);
@@ -299,7 +243,6 @@ export async function renderStatsCard(stats, options = {}) {
         svg.push(`<circle ${progressAttrs} style="${animInline}" />`);
       }
     } else {
-      // Default
       progressAttrs += ` class="rank-circle" stroke="${strokeValue}"`;
       if (disableAnimations) {
         progressAttrs += ` stroke-dashoffset="${target}" style="animation: none;"`;
