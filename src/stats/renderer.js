@@ -427,7 +427,7 @@ export function renderErrorCard(message, options = {}) {
 
   // Tinggi kartu
   const titleBlockHeight = TITLE_FONT_SIZE + 8;
-  const cardHeight = PADDING + iconSize + iconGap + titleBlockHeight + 10 + (wrappedLines.length * lineHeight) + PADDING;
+  const cardHeight = PADDING + iconSize + iconGap + titleBlockHeight + 10 + (wrappedLines.length * lineHeight) + PADDING - 2;
 
   // Posisi
   const iconX = (cardWidth - iconSize) / 2;
