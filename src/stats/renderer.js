@@ -205,7 +205,7 @@ export async function renderStatsCard(stats, options = {}) {
       svg.push(`<circle class="rank-circle-rim" cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" />`);
     }
 
-    let progressAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="round"`;
+    let progressAttrs = `cx="${cx}" cy="${cy}" r="${RANK_RADIUS}" fill="none" stroke-linecap="${ringDesign === 'transparent-tip' ? 'butt' : 'round'}"`;
     let strokeValue = `#${ringColor}`;
     let useClass = true;
 
@@ -218,13 +218,18 @@ export async function renderStatsCard(stats, options = {}) {
       strokeValue = `url(#${gradId})`;
       useClass = false;
     } else if (ringDesign === 'transparent-tip') {
-      const gradId = `transTip-${Date.now()}`;
-      svg.push(`<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">`);
-      svg.push(`<stop offset="0%" stop-color="#${ringColor}" stop-opacity="1" />`);
-      svg.push(`<stop offset="100%" stop-color="#${ringColor}" stop-opacity="0" />`);
-      svg.push(`</linearGradient></defs>`);
-      strokeValue = `url(#${gradId})`;
-      useClass = false;
+  const gradId = `transTip-${Date.now()}`;
+  svg.push(`<defs>
+    <linearGradient id="${gradId}" gradientUnits="userSpaceOnUse"
+      x1="${cx - RANK_RADIUS}" y1="${cy}"
+      x2="${cx + RANK_RADIUS}" y2="${cy}">
+      <stop offset="0%" stop-color="#${ringColor}" stop-opacity="1" />
+      <stop offset="85%" stop-color="#${ringColor}" stop-opacity="1" />
+      <stop offset="100%" stop-color="#${ringColor}" stop-opacity="0" />
+    </linearGradient>
+  </defs>`);
+  strokeValue = `url(#${gradId})`;
+  useClass = false;
     }
 
     // Animasi
