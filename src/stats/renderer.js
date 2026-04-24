@@ -374,3 +374,84 @@ function escapeXml(unsafe) {
   if (typeof unsafe !== 'string') unsafe = String(unsafe);
   return unsafe.replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '\'': '&apos;', '"': '&quot;' })[c]);
 }
+
+// src/stats/renderer.js (tambahan di bawah)
+
+export function renderErrorCard(message, options = {}) {
+  const theme = themes[options.theme] || themes.default;
+  const defaultTheme = themes.default;
+  const locale = options.locale || 'en';
+  const i18n = locales[locale] || locales.en;
+
+  const getColor = (prop, fallbackProp) => {
+    if (theme[prop]) return theme[prop];
+    if (fallbackProp && theme[fallbackProp]) return theme[fallbackProp];
+    if (defaultTheme[prop]) return defaultTheme[prop];
+    return defaultTheme[fallbackProp] || 'ffffff';
+  };
+
+  const fontFamily = "'Segoe UI', Ubuntu, Sans-Serif";
+  const titleColor = cleanColor(options.title_color || theme.titleColor || defaultTheme.titleColor);
+  const textColor = cleanColor(options.text_color || theme.textColor || defaultTheme.textColor);
+  const borderColor = cleanColor(options.border_color || theme.borderColor || defaultTheme.borderColor);
+  const rawBgColor = options.bg_color || theme.bgColor || defaultTheme.bgColor;
+  const borderRadius = options.border_radius || '4.5';
+  const hideBorder = options.hide_border === 'true';
+
+  // Gradient background jika diperlukan
+  let isGradient = false, gradientId = null, gradientAngle = 0, gradientStops = [];
+  if (typeof rawBgColor === 'string' && rawBgColor.includes(',')) {
+    isGradient = true;
+    const parts = rawBgColor.split(',').map(p => p.trim());
+    gradientAngle = parseInt(parts[0], 10) || 0;
+    gradientStops = parts.slice(1).map(c => cleanColor(c));
+    gradientId = `g${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+  }
+  const bgColor = cleanColor(rawBgColor);
+
+  // Teks error yang mungkin panjang, akan di-wrap
+  const errorTitle = i18n.error || 'Error';
+  const errorMessage = message || 'Unknown error';
+
+  // Estimasi lebar minimal 400px, tinggi dihitung dari teks
+  const minWidth = 400;
+  const maxMsgWidth = 320; // area teks setelah padding
+  const wrappedLines = wrapText(errorMessage, maxMsgWidth, METRIC_FONT_SIZE);
+  const lineHeight = 20;
+  const titleHeight = 22;
+  const textBlockHeight = wrappedLines.length * lineHeight;
+  const cardHeight = PADDING * 2 + titleHeight + 10 + textBlockHeight + PADDING;
+  const cardWidth = Math.max(minWidth, measureTextWidth(errorTitle, TITLE_FONT_SIZE) + 2 * PADDING);
+
+  const svg = [];
+  svg.push(`<svg width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Error Card">`);
+  svg.push(`<style>`);
+  svg.push(`.header { font: 600 18px ${fontFamily}; fill: #${titleColor}; }`);
+  svg.push(`.error-text { font: 400 14px ${fontFamily}; fill: #${textColor}; }`);
+  svg.push(`</style>`);
+
+  const bgFill = isGradient ? `url(#${gradientId})` : `#${bgColor}`;
+  if (isGradient) {
+    svg.push(`<defs><linearGradient id="${gradientId}" gradientTransform="rotate(${gradientAngle})">`);
+    gradientStops.forEach((c, i) => {
+      const offset = (i / (gradientStops.length - 1)) * 100;
+      svg.push(`<stop offset="${offset}%" stop-color="#${c}"/>`);
+    });
+    svg.push(`</linearGradient></defs>`);
+  }
+
+  svg.push(`<rect x="0.5" y="0.5" rx="${borderRadius}" width="${cardWidth - 1}" height="${cardHeight - 1}" fill="${bgFill}" stroke="#${borderColor}" stroke-width="2" stroke-opacity="${hideBorder ? '0' : '1'}" />`);
+
+  // Judul error
+  svg.push(`<text x="${PADDING}" y="${PADDING + TITLE_FONT_SIZE}" class="header">${escapeXml(errorTitle)}</text>`);
+
+  // Pesan error (wrap vertikal)
+  let y = PADDING + TITLE_FONT_SIZE + 10;
+  wrappedLines.forEach(line => {
+    svg.push(`<text x="${PADDING}" y="${y + METRIC_FONT_SIZE}" class="error-text">${escapeXml(line)}</text>`);
+    y += lineHeight;
+  });
+
+  svg.push(`</svg>`);
+  return svg.join('');
+}
