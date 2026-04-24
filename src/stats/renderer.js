@@ -413,7 +413,7 @@ export function renderErrorCard(message, options = {}) {
   const minWidth = 400;
   const titleWidth = measureTextWidth(errorTitle, TITLE_FONT_SIZE);
   const cardWidth = Math.max(minWidth, titleWidth + 2 * PADDING);
-  const textAreaWidth = cardWidth - 2 * PADDING; // teks menggunakan seluruh lebar tersedia
+  const textAreaWidth = cardWidth - PADDING; // teks menggunakan seluruh lebar tersedia
 
   const wrappedLines = wrapText(errorMessage, textAreaWidth, METRIC_FONT_SIZE);
   const lineHeight = 22;
