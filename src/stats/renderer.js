@@ -1,5 +1,6 @@
 import { formatNumber, formatSize, measureTextWidth, wrapText } from '../lib/formatters.js';
 import themes from './themes.js';
+import { locales } from './i18n.js';
 import { octiconPaths } from './icons.js';
 import fetch from 'node-fetch';
 import sharp from 'sharp';
@@ -66,6 +67,9 @@ async function processAvatarFromBase64(base64Data, size, quality) {
 export async function renderStatsCard(stats, options = {}) {
   const theme = themes[options.theme] || themes.default;
   const defaultTheme = themes.default;
+
+  const locale = options.locale || 'en';
+  const i18n = locales[locale] || locales.en;
 
   // Helper untuk warna dengan fallback ke defaultTheme
   const getColor = (prop, fallbackProp) => {
@@ -134,7 +138,12 @@ export async function renderStatsCard(stats, options = {}) {
       if (key === 'totalSize') formatted = formatSize(value);
       else if (key === 'topLanguage') formatted = String(value);
       else formatted = formatNumber(value);
-      statItems.push({ ...def, value: formatted, key });
+      statItems.push({
+  key,
+  value: formatted,
+  icon: def.icon,
+  label: i18n.metrics[key] || def.label || key
+});
     }
   }
 
@@ -306,7 +315,7 @@ export async function renderStatsCard(stats, options = {}) {
         svg.push(`<g class="rank-text"><text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text></g>`);
       }
     } else if (rankIcon === 'progress') {
-      svg.push(`<text x="-5" y="-7" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 12px;">TOP</text>`);
+      svg.push(`<text x="-5" y="-7" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 12px;">${escapeXml(i18n.top)}</text>`);
       svg.push(`<text x="-5" y="12" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" class="rank-text" style="font-size: 16px;">${stats.rank.percentile}%</text>`);
     } else {
       svg.push(`<g class="rank-text"><text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle">${stats.rank.level || 'C+'}</text></g>`);
@@ -330,7 +339,7 @@ export async function renderStatsCard(stats, options = {}) {
     const labelX = showIcons ? ICON_SIZE + ICON_SPACING : 0;
     const valueX = labelX + maxLabelW + LABEL_VALUE_GAP;
     
-    svg.push(`<text class="stat-label" x="${labelX}" y="12.5">${escapeXml(item.label)}</text>`);
+    svg.push(`<text class="stat-label" x="${labelX}" y="12.5">${escapeXml(item.label)}:</text>`);
     svg.push(`<text class="stat-value" x="${valueX}" y="12.5" data-testid="${item.key}">${escapeXml(item.value)}</text>`);
     svg.push(`</g></g>`);
   });

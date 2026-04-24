@@ -6,6 +6,9 @@ export default async function handler(req, res) {
   try {
     const { org, exclude, theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon, all_bold, photo_resize, photo_quality, value_color, rank_icon_color } = req.query;
 
+const validLocales = ['en', 'id', 'fr'];
+const locale = validLocales.includes(req.query.locale) ? req.query.locale : 'en';
+
     if (!org) throw new Error('Parameter "org" is required');
 
     let resize = parseInt(photo_resize);
@@ -34,7 +37,7 @@ export default async function handler(req, res) {
       theme, hide, show, show_icons, hide_rank, disable_animations, custom_title, hide_border, border_radius, card_width, bg_color, title_color, text_color, icon_color, border_color, ring_color, rank_icon, all_bold,
       photo_resize: resize,
       photo_quality: quality,
-      value_color, rank_icon_color
+      value_color, rank_icon_color, locale
     });
 
     res.setHeader('Content-Type', 'image/svg+xml');
