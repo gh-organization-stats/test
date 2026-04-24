@@ -16,7 +16,7 @@ const RANK_STROKE = 6;
 const ICON_SIZE = 16;
 const ICON_SPACING = 9;
 const RIGHT_MARGIN = 20;
-const EXTRA_WIDTH = 40;
+const EXTRA_WIDTH = 44; // dikalibrasi untuk width≈434 saat data contoh Inggris
 const LABEL_VALUE_GAP = 50;
 
 function cleanColor(c) {
@@ -71,7 +71,6 @@ export async function renderStatsCard(stats, options = {}) {
   const locale = options.locale || 'en';
   const i18n = locales[locale] || locales.en;
 
-  // Helper untuk warna dengan fallback ke defaultTheme
   const getColor = (prop, fallbackProp) => {
     if (theme[prop]) return theme[prop];
     if (fallbackProp && theme[fallbackProp]) return theme[fallbackProp];
@@ -104,7 +103,6 @@ export async function renderStatsCard(stats, options = {}) {
   const valueColor = cleanColor(options.value_color || getColor('valueColor', 'textColor'));
   const rankIconColor = cleanColor(options.rank_icon_color || getColor('rankIconColor', 'textColor'));
 
-  // Ring color: jika tidak ada di tema, ambil dari titleColor
   const ringColorRaw = options.ring_color || theme.ringColor || theme.titleColor || defaultTheme.ringColor;
   let ringIsGradient = false;
   let ringGradientAngle = 0;
@@ -128,6 +126,7 @@ export async function renderStatsCard(stats, options = {}) {
   }
   const bgColor = cleanColor(rawBgColor);
 
+  // Kumpulkan metrik dengan label dari i18n
   const statItems = [];
   for (const [key, def] of Object.entries(METRIC_DEFS)) {
     if (hide.has(key)) continue;
@@ -139,19 +138,40 @@ export async function renderStatsCard(stats, options = {}) {
       else if (key === 'topLanguage') formatted = String(value);
       else formatted = formatNumber(value);
       statItems.push({
-  key,
-  value: formatted,
-  icon: def.icon,
-  label: i18n.metrics[key] || def.label || key
-});
+        key,
+        value: formatted,
+        icon: def.icon,
+        label: i18n.metrics[key] || def.label || key
+      });
     }
   }
 
-  let maxLabelW = 0, maxValueW = 0;
+  // Hitung lebar teks terjemahan
+  let translatedLabelW = 0;
   statItems.forEach(item => {
     const lw = measureTextWidth(item.label, METRIC_FONT_SIZE);
+    if (lw > translatedLabelW) translatedLabelW = lw;
+  });
+
+  // Hitung lebar teks default (Inggris) untuk patokan minimum
+  const enLabels = locales.en.metrics;
+  let minLabelW = 0;
+  for (const [key, def] of Object.entries(METRIC_DEFS)) {
+    if (hide.has(key)) continue;
+    if (CORE_METRICS.has(key) || show.has(key)) {
+      const enLabel = enLabels[key] || def.label || key;
+      const lw = measureTextWidth(enLabel, METRIC_FONT_SIZE);
+      if (lw > minLabelW) minLabelW = lw;
+    }
+  }
+
+  // Gunakan yang terbesar: label terjemahan atau label Inggris
+  const maxLabelW = Math.max(translatedLabelW, minLabelW);
+
+  // Lebar nilai (tetap dihitung dari nilai aktual)
+  let maxValueW = 0;
+  statItems.forEach(item => {
     const vw = measureTextWidth(item.value, METRIC_FONT_SIZE);
-    if (lw > maxLabelW) maxLabelW = lw;
     if (vw > maxValueW) maxValueW = vw;
   });
 
