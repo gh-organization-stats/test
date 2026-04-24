@@ -217,25 +217,80 @@ export async function renderStatsCard(stats, options = {}) {
       svg.push(`</linearGradient></defs>`);
       strokeValue = `url(#${gradId})`;
       useClass = false;
-    } else if (ringDesign === 'transparent-tip') {
+} else if (ringDesign === 'transparent-tip') {
+  // hitung panjang arc
+  const progress = (stats.rank?.percentile || 0) / 100;
+  const tipLen = Math.max(6, Math.min(RANK_STROKE * 1.6, circ * 0.08));
+  const tipPct = tipLen / circ;
+  const mainPct = Math.max(0, progress - tipPct);
+
+  const startAngle = -90;
+  const mainEndAngle = startAngle + mainPct * 360;
+  const tipStartAngle = mainEndAngle;
+  const tipEndAngle = startAngle + progress * 360;
+
+  const polarToCartesian = (cx, cy, r, angleDeg) => {
+    const rad = ((angleDeg - 90) * Math.PI) / 180;
+    return {
+      x: cx + r * Math.cos(rad),
+      y: cy + r * Math.sin(rad),
+    };
+  };
+
+  const describeArc = (cx, cy, r, startAngle, endAngle) => {
+    const start = polarToCartesian(cx, cy, r, startAngle);
+    const end = polarToCartesian(cx, cy, r, endAngle);
+    const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
+  };
+
+  const tipStart = polarToCartesian(cx, cy, RANK_RADIUS, tipStartAngle);
+  const tipEnd = polarToCartesian(cx, cy, RANK_RADIUS, tipEndAngle);
+
   const gradId = `transTip-${Date.now()}`;
   svg.push(`<defs>
     <linearGradient id="${gradId}" gradientUnits="userSpaceOnUse"
-      x1="${cx - RANK_RADIUS}" y1="${cy}"
-      x2="${cx + RANK_RADIUS}" y2="${cy}">
-      <stop offset="0%" stop-color="#${ringColor}" stop-opacity="1" />
-      <stop offset="85%" stop-color="#${ringColor}" stop-opacity="1" />
-      <stop offset="100%" stop-color="#${ringColor}" stop-opacity="0" />
+      x1="${tipStart.x}" y1="${tipStart.y}"
+      x2="${tipEnd.x}" y2="${tipEnd.y}">
+      <stop offset="0%" stop-color="#${ringColor}" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#${ringColor}" stop-opacity="0"/>
     </linearGradient>
   </defs>`);
-  strokeValue = `url(#${gradId})`;
+
+  // gambar MAIN (solid)
+  if (mainPct > 0) {
+    const mainPath = describeArc(cx, cy, RANK_RADIUS, startAngle, mainEndAngle);
+    svg.push(`<path
+      d="${mainPath}"
+      fill="none"
+      stroke="#${ringColor}"
+      stroke-width="${RANK_STROKE}"
+      stroke-linecap="butt"
+      ${transformAttr}
+    />`);
+  }
+
+  // gambar TIP (fade)
+  if (progress > 0) {
+    const tipPath = describeArc(cx, cy, RANK_RADIUS, tipStartAngle, tipEndAngle);
+    svg.push(`<path
+      d="${tipPath}"
+      fill="none"
+      stroke="url(#${gradId})"
+      stroke-width="${RANK_STROKE}"
+      stroke-linecap="butt"
+      ${transformAttr}
+    />`);
+  }
+
+  // supaya circle default tidak digambar lagi
   useClass = false;
-    }
+}
 
     // Animasi
     const animInline = disableAnimations ? '' : ` animation: rankAnimation 1s forwards ease-in-out;`;
 
-    if (!useClass) {
+    if (!useClass && ringDesign !== 'transparent-tip') {
       // Gradient / transparent-tip: tulis inline
       progressAttrs += ` stroke="${strokeValue}" stroke-width="${RANK_STROKE}" stroke-dasharray="${circ}" stroke-dashoffset="${disableAnimations ? target : '251.32741228718345'}" ${transformAttr}`;
       if (disableAnimations) {
