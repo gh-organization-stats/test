@@ -65,6 +65,16 @@ async function processAvatarFromBase64(base64Data, size, quality) {
 
 export async function renderStatsCard(stats, options = {}) {
   const theme = themes[options.theme] || themes.default;
+  const defaultTheme = themes.default;
+
+  // Helper untuk warna dengan fallback ke defaultTheme
+  const getColor = (prop, fallbackProp) => {
+    if (theme[prop]) return theme[prop];
+    if (fallbackProp && theme[fallbackProp]) return theme[fallbackProp];
+    if (defaultTheme[prop]) return defaultTheme[prop];
+    return defaultTheme[fallbackProp] || 'ffffff';
+  };
+
   const hide = new Set((options.hide || '').split(',').filter(Boolean));
   const show = new Set((options.show || '').split(',').filter(Boolean));
   const showIcons = options.show_icons === 'true';
@@ -81,17 +91,17 @@ export async function renderStatsCard(stats, options = {}) {
 
   const fontFamily = "'Segoe UI', Ubuntu, Sans-Serif";
 
-  const titleColor = cleanColor(options.title_color || theme.titleColor);
-  const textColor = cleanColor(options.text_color || theme.textColor);   // untuk label
-  const iconColor = cleanColor(options.icon_color || theme.iconColor);  // untuk ikon metrik
-  const borderColor = cleanColor(options.border_color || theme.borderColor);
-  const rawBgColor = options.bg_color || theme.bgColor;
+  const titleColor = cleanColor(options.title_color || theme.titleColor || defaultTheme.titleColor);
+  const textColor = cleanColor(options.text_color || theme.textColor || defaultTheme.textColor);
+  const iconColor = cleanColor(options.icon_color || theme.iconColor || defaultTheme.iconColor);
+  const borderColor = cleanColor(options.border_color || theme.borderColor || defaultTheme.borderColor);
+  const rawBgColor = options.bg_color || theme.bgColor || defaultTheme.bgColor;
 
-  const valueColor = cleanColor(options.value_color || theme.valueColor || theme.textColor);
-  const rankIconColor = cleanColor(options.rank_icon_color || theme.rankIconColor || theme.iconColor);
+  const valueColor = cleanColor(options.value_color || getColor('valueColor', 'textColor'));
+  const rankIconColor = cleanColor(options.rank_icon_color || getColor('rankIconColor', 'textColor'));
 
-  // Ring color: bisa solid atau gradient (format: angle,color1,color2,...)
-  const ringColorRaw = options.ring_color || theme.ringColor;
+  // Ring color: jika tidak ada di tema, ambil dari titleColor
+  const ringColorRaw = options.ring_color || theme.ringColor || theme.titleColor || defaultTheme.ringColor;
   let ringIsGradient = false;
   let ringGradientAngle = 0;
   let ringGradientStops = [];
